@@ -88,7 +88,7 @@ const SidebarLink = ({
                 <div className="size-4 shrink-0" />
               )}
             </span>
-            <span className={cn("text-sm")}>{link.name}</span>
+            <span className="text-sm select-none">{link.name}</span>
             <span className="ml-auto p-1">
               <ChevronDownIcon
                 className={cn(
@@ -101,17 +101,23 @@ const SidebarLink = ({
             </span>
           </div>
         </li>
-        {isSubmenuOpen &&
-          link.subMenu &&
-          link.subMenu.map((subLink) => (
-            <SidebarLink
-              key={subLink.name}
-              link={subLink}
-              isActive={isActive}
-              openSubmenu={openSubmenu}
-              setOpenSubmenu={setOpenSubmenu}
-            />
-          ))}
+        <div
+          className={cn(
+            "transition-all duration-300 ease-in-out relative overflow-hidden",
+            isSubmenuOpen ? "max-h-96 translate-y-0" : "max-h-0 -translate-y-full"
+          )}
+        >
+          {link.subMenu &&
+            link.subMenu.map((subLink) => (
+              <SidebarLink
+                key={subLink.name}
+                link={subLink}
+                isActive={isActive}
+                openSubmenu={openSubmenu}
+                setOpenSubmenu={setOpenSubmenu}
+              />
+            ))}
+        </div>
       </div>
     );
   }
