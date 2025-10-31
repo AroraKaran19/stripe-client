@@ -52,21 +52,24 @@ const Header = () => {
       <Searchbar />
       <div className="action-btns ml-auto flex gap-5 items-center">
         {actionBtns.map((btn) => {
-          if (btn.href) {
-            return (
-              <div
-                className={cn(
-									"size-5 flex items-center justify-center",
-                  "relative before:absolute before:w-[calc(100%+12px)] before:h-[calc(100%+12px)]",
-                  "before:max-h-6 before:-left-1.5 before:top-1/2 before:-translate-y-1/2",
-                  "before:rounded-md before:pointer-events-none before:p-1.5 before:z-[-1] before:transition-all before:duration-300 before:ease-in-out",
-                  {
-                    "hover:before:!bg-black/10": !isActive(btn.href),
-                    "hover:before:!bg-[#675dff]/10": isActive(btn.href),
-                  }
-                )}
-              >
-                <Link key={btn.name} to={btn.href}>
+          return (
+            <div
+              className={cn(
+                "size-5 flex items-center justify-center hover:before:!bg-black/10",
+                "relative before:absolute before:w-[calc(100%+12px)] before:h-[calc(100%+12px)]",
+                "before:max-h-6 before:-left-1.5 before:top-1/2 before:-translate-y-1/2",
+                "before:rounded-md before:pointer-events-none before:p-1.5 before:z-[-1] before:transition-all before:duration-300 before:ease-in-out",
+                {
+                  "hover:before:!bg-[#675dff]/10":
+                    btn.href && isActive(btn.href),
+                }
+              )}
+            >
+              {btn.href ? (
+                <Link
+                  to={btn.href}
+                  className="flex items-center justify-center"
+                >
                   {cloneElement(btn.icon as React.ReactElement<SVGSVGElement>, {
                     className: cn("size-4 shrink-0", {
                       "!text-[#474e5a]": !isActive(btn.href),
@@ -74,17 +77,22 @@ const Header = () => {
                     }),
                   })}
                 </Link>
-              </div>
-            );
-          }
-          return (
-            <button key={btn.name} className={cn("size-5 cursor-pointer text-[#474e5a]")}>
-              {btn.icon}
-            </button>
+              ) : (
+                <button
+                  className={cn(
+                    "size-5 flex items-center justify-center cursor-pointer text-[#474e5a]"
+                  )}
+                >
+                  {btn.icon}
+                </button>
+              )}
+            </div>
           );
         })}
-        <button className="p-1 rounded-full bg-[#675dff] cursor-pointer">
-          <CreateIcon className="size-3 text-white" />
+        <button className="p-1 rounded-full cursor-pointer hover:bg-black/10 transition-all duration-300 ease-in-out">
+          <div className="p-1 rounded-full bg-[#675dff]">
+            <CreateIcon className="size-3 text-white" />
+          </div>
         </button>
       </div>
     </header>
