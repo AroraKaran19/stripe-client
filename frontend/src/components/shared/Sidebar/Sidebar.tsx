@@ -11,16 +11,18 @@ import {
   ReportingIcon,
   ShortcutIcon,
   TransactionIcon,
-} from "../../../assets/menuIcons";
+  DeveloperIcon,
+} from "../../../assets";
 import type { MenuLink } from "../../../types";
-import AccountManager from "../Navbar/components/AccountManager";
+import AccountManager from "./components/AccountManager";
 import SidebarLink from "./components/SidebarLink";
 import { useState } from "react";
-import DeveloperIcon from "../../../assets/menuIcons/DeveloperIcon";
 import { cn } from "../../../utils";
+import { useSidebar } from "../../../context/SidebarContext";
 
 const Sidebar = () => {
   const location = useLocation().pathname;
+  const { isCollapsed, isHovering } = useSidebar();
 
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
@@ -225,7 +227,16 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-60.25 flex flex-col sticky top-0 left-0 h-dvh bg-white text-[#353a44] border-r border-gray-200 shrink-0 overflow-y-auto">
+    <aside
+      className={cn(
+        "flex flex-col sticky top-0 left-0 h-dvh bg-white text-[#353a44] shadow-[inset_-1px_0_0_0_#e5e7eb] shrink-0 overflow-y-auto overflow-x-hidden transition-all duration-500 ease-in-out",
+        {
+          "w-59": isHovering,
+          "w-60": !isHovering,
+          "w-16": isCollapsed,
+        }
+      )}
+    >
       <div className="account-wrapper mx-5 h-15 flex items-center relative shrink-0">
         <AccountManager user={user} />
       </div>
@@ -242,27 +253,43 @@ const Sidebar = () => {
           ))}
         </ul>
         <ul className="sidebar-shortcut-list relative">
-          <div className="h-6.5 flex items-center">
-            <span className="text-xs font-medium text-[#596171]">
-              Shortcuts
-            </span>
-          </div>
-          {shortcutLinks.map((link) => (
-            <SidebarLink
-              key={link.name}
-              link={link}
-              isActive={isActive}
-              openSubmenu={openSubmenu}
-              setOpenSubmenu={setOpenSubmenu}
-            />
-          ))}
+          {!isCollapsed && (
+            <div className="h-6.5 flex items-center">
+              <span className="text-xs font-medium text-[#596171]">
+                Shortcuts
+              </span>
+            </div>
+          )}
+          {!isCollapsed
+            ? shortcutLinks.map((link) => (
+                <SidebarLink
+                  key={link.name}
+                  link={link}
+                  isActive={isActive}
+                  openSubmenu={openSubmenu}
+                  setOpenSubmenu={setOpenSubmenu}
+                />
+              ))
+            : shortcutLinks
+                .slice(0, 1)
+                .map((link) => (
+                  <SidebarLink
+                    key={link.name}
+                    link={link}
+                    isActive={isActive}
+                    openSubmenu={openSubmenu}
+                    setOpenSubmenu={setOpenSubmenu}
+                  />
+                ))}
         </ul>
         <ul className="sidebar-product-list relative">
-          <div className="h-6.5 flex items-center">
-            <span className="text-xs font-medium text-[#596171]">
-              Product catalog
-            </span>
-          </div>
+          {!isCollapsed && (
+            <div className="h-6.5 flex items-center">
+              <span className="text-xs font-medium text-[#596171] whitespace-nowrap">
+                Product catalog
+              </span>
+            </div>
+          )}
           {productLinks.map((link) => (
             <SidebarLink
               key={link.name}
@@ -285,10 +312,16 @@ const Sidebar = () => {
             />
           </span>
           <span
-            className={cn("text-sm", {
-              "text-[#596171]": !isActive("/developers"),
-              "text-[#6b61ff] font-semibold": isActive("/developers"),
-            })}
+            className={cn(
+              "text-sm",
+              {
+                "text-[#596171]": !isActive("/developers"),
+                "text-[#6b61ff] font-semibold": isActive("/developers"),
+              },
+              {
+                hidden: isCollapsed,
+              }
+            )}
           >
             Developers
           </span>

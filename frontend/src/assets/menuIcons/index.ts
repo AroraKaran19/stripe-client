@@ -9,6 +9,7 @@ import PaymentIcon from "./PaymentIcon";
 import BillingIcon from "./BillingIcon";
 import ReportingIcon from "./ReportingIcon";
 import MoreIcon from "./MoreIcon";
+import DeveloperIcon from "./DeveloperIcon";
 
 export {
   HomeIcon,
@@ -22,4 +23,5 @@ export {
   BillingIcon,
   ReportingIcon,
   MoreIcon,
+  DeveloperIcon,
 };

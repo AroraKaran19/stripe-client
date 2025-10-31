@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "../../../../utils";
 import { ChevronDown } from "lucide-react";
+import { useSidebar } from "../../../../context/SidebarContext";
 
 const AccountManager = ({
   user,
@@ -8,6 +9,7 @@ const AccountManager = ({
   user: { name: string; email: string };
 }) => {
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
+  const { isCollapsed } = useSidebar();
 
   return (
     <div
@@ -21,14 +23,24 @@ const AccountManager = ({
       onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
       title={user.name}
     >
-      <div className="account-icon size-6 rounded-sm bg-[#f5f6f8] flex items-center justify-center">
+      <div className="account-icon size-6 rounded-sm bg-[#f5f6f8] flex items-center justify-center shrink-0">
         <span className="text-xs font-semibold">{user.name.charAt(0)}</span>
       </div>
-      <span className="text-sm font-semibold">{user.name}</span>
-      <span className="p-1 ml-auto">
+      <span
+        className={cn("text-sm font-semibold whitespace-nowrap", {
+          hidden: isCollapsed,
+        })}
+      >
+        {user.name}
+      </span>
+      <span
+        className={cn("p-1 ml-auto", {
+          hidden: isCollapsed,
+        })}
+      >
         <ChevronDown
           className={cn(
-            "size-2 stroke-4 transition-transform duration-300 ease-in-out",
+            "size-3 stroke-3 transition-transform duration-300 ease-in-out",
             {
               "rotate-180": isAccountDropdownOpen,
             }
