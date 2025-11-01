@@ -10,7 +10,8 @@ import type { Transaction } from "../../../../types";
 import VisaIcon from "../../../../assets/transaction/VisaIcon";
 import { cn } from "../../../../utils";
 
-const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
+const SlugHeader = ({ transaction }: { transaction: Transaction | null }) => {
+  if (!transaction) return null;
   return (
     <div className="w-full flex flex-col">
       <div className="top flex items-center gap-2 flex-col lg:flex-row">
@@ -22,9 +23,13 @@ const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
           <div className="flex items-center gap-2">
             <span className="text-3xl text-gray-500">
               <span className="font-bold text-black">
-                ${transaction.amount}
-              </span>{" "}
-              USD
+                {transaction.amount
+                  ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: transaction.currency || "USD",
+                    }).format(transaction.amount)
+                  : "$0.00"}
+              </span>
             </span>
             {transaction.status === "succeeded" && (
               <div className="bg-[#eafcdd] border border-[#a8f170] px-1.5 py-px flex items-center gap-1 justify-center rounded-sm">
@@ -38,7 +43,7 @@ const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
           <span className="text-base text-gray-500">
             Charged to{" "}
             <span className="text-[#533afd]">
-              {transaction.owner.toUpperCase()}
+              {transaction.owner?.toUpperCase() ?? "—"}
             </span>
           </span>
         </div>
@@ -58,7 +63,7 @@ const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
         <div className="payment-id w-full flex flex-col gap-2">
           <h6 className="text-sm font-bold">Payment ID</h6>
           <span className="w-max text-sm text-gray-500 flex items-center gap-1 p-1 hover:bg-gray-100 rounded-sm cursor-pointer max-w-[256px]">
-            {transaction.payment_id}
+            {transaction.payment_id ?? "—"}
             <ClipboardCopy className="size-3 stroke-2 text-gray-500" />
           </span>
         </div>
@@ -66,13 +71,13 @@ const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
           <h6 className="text-sm font-bold">Payment Method</h6>
           <span className="text-sm text-gray-500 flex items-center gap-1">
             <VisaIcon className="size-5" /> ••••{" "}
-            {transaction.payment_method.cart_last_four}
+            {transaction.payment_method?.cart_last_four ?? "—"}
           </span>
         </div>
         <div className="description w-full flex flex-col gap-2">
           <h6 className="text-sm font-bold">Description</h6>
           <span className="text-sm flex items-center flex-wrap gap-1">
-            {transaction.description}
+            {transaction.description ?? "—"}
             <span className="cursor-pointer text-[#533afd] flex items-center gap-1 flex-wrap">
               <span>Edit</span>
               <span>
@@ -84,39 +89,47 @@ const SlugHeader = ({ transaction }: { transaction: Transaction }) => {
         <div className="statement-descriptor w-full flex flex-col gap-2">
           <h6 className="text-sm font-bold">Statement descriptor</h6>
           <span className="text-sm flex items-center flex-wrap gap-1">
-            {transaction.statement_descriptor}
+            {transaction.statement_descriptor ?? "—"}
           </span>
         </div>
         <div className="last-updated w-full flex flex-col gap-2">
           <h6 className="text-sm font-bold">Last updated</h6>
           <span className="text-sm flex items-center flex-wrap gap-1">
-            {transaction.updatedAt?.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
-              hour12: true,
-            })}
+            {transaction.updatedAt
+              ? new Date(transaction.updatedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                })
+              : "—"}
           </span>
         </div>
         <div className="risk-evaluation w-full flex flex-col gap-2">
           <h6 className="text-sm font-bold">Risk evaluation</h6>
           <span className="text-sm flex items-center gap-1">
-            <span
-              className={cn(
-                "p-0.5 rounded-full size-5 font-bold flex items-center justify-center text-xs",
-                transaction.risk_evaluation.level === "low"
-                  ? "bg-green-500 text-white"
-                  : transaction.risk_evaluation.level === "normal"
-                  ? "bg-yellow-500 text-red-500"
-                  : "bg-red-500 text-white"
-              )}
-            >
-              {transaction.risk_evaluation.score}
-            </span>
-            <span className="capitalize">
-              {transaction.risk_evaluation.level}
-            </span>
+            {transaction.risk_evaluation ? (
+              <>
+                <span
+                  className={cn(
+                    "p-0.5 rounded-full size-5 font-bold flex items-center justify-center text-xs",
+                    transaction.risk_evaluation.level === "low"
+                      ? "bg-green-500 text-white"
+                      : transaction.risk_evaluation.level === "normal"
+                      ? "bg-yellow-500 text-red-500"
+                      : "bg-red-500 text-white"
+                  )}
+                >
+                  {transaction.risk_evaluation.score ?? "—"}
+                </span>
+                <span className="capitalize">
+                  {transaction.risk_evaluation.level ?? "—"}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm text-gray-500">—</span>
+            )}
           </span>
         </div>
       </div>

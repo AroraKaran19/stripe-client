@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import {
   Eye,
-  MoreVertical,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -10,15 +10,18 @@ import {
   Trash2,
   Plus,
   RefreshCw,
+  Edit2,
 } from "lucide-react";
 import { cn } from "../../utils";
 import StatusBadge from "../../components/transactions/StatusBadge";
 import CreateTransactionModal from "../../components/transactions/CreateTransactionModal";
+import EditTransactionModal from "../../components/transactions/EditTransactionModal";
 import { transactionService } from "../../services/transaction.service";
 import type { Transaction } from "../../types/transaction";
 
 const AdminTransactionManagementPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,10 @@ const AdminTransactionManagementPage = () => {
   );
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] =
+    useState<Transaction | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const statusOptions = [
     { label: "All", value: "all" },
@@ -157,8 +164,48 @@ const AdminTransactionManagementPage = () => {
     selectedTransactions.size < transactions.length;
 
   return (
-    <div className="w-full flex flex-col gap-6 p-6">
-      {/* Header */}
+    <>
+      <Helmet>
+        <title>Transaction Management | Visualize & Build ltd. - Stripe Admin</title>
+        <meta
+          name="description"
+          content="Admin panel for managing and monitoring all transactions. Create, edit, delete, and track transactions with comprehensive filtering and search capabilities."
+        />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta
+          property="og:title"
+          content="Transaction Management | Visualize & Build ltd. - Stripe Admin"
+        />
+        <meta
+          property="og:description"
+          content="Admin panel for managing and monitoring all transactions. Create, edit, delete, and track transactions with comprehensive filtering and search capabilities."
+        />
+        <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
+        <meta property="og:site_name" content="Visualize & Build ltd." />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta
+          name="twitter:title"
+          content="Transaction Management | Visualize & Build ltd. - Stripe Admin"
+        />
+        <meta
+          name="twitter:description"
+          content="Admin panel for managing and monitoring all transactions. Create, edit, delete, and track transactions with comprehensive filtering and search capabilities."
+        />
+
+        {/* Additional meta tags */}
+        <meta
+          name="keywords"
+          content="transaction management, admin panel, payment administration, transaction tracking, financial management, stripe admin"
+        />
+        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      <div className="w-full flex flex-col gap-6 p-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
@@ -465,14 +512,21 @@ const AdminTransactionManagementPage = () => {
                             <Eye className="size-4" />
                           </button>
                           <button
+                            onClick={() => {
+                              setSelectedTransaction(transaction);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                            title="Edit transaction"
+                          >
+                            <Edit2 className="size-4" />
+                          </button>
+                          <button
                             onClick={() => handleDelete(transaction._id || "")}
                             className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
                             title="Delete transaction"
                           >
                             <Trash2 className="size-4" />
-                          </button>
-                          <button className="p-1.5 text-gray-600 hover:text-[#533afd] hover:bg-[#533afd]/10 rounded transition-colors cursor-pointer">
-                            <MoreVertical className="size-4" />
                           </button>
                         </div>
                       </td>
@@ -563,7 +617,25 @@ const AdminTransactionManagementPage = () => {
         isCreating={isCreating}
         setIsCreating={setIsCreating}
       />
-    </div>
+
+      {/* Edit Transaction Modal */}
+      <EditTransactionModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedTransaction(null);
+        }}
+        onSuccess={() => {
+          setIsEditModalOpen(false);
+          setSelectedTransaction(null);
+          fetchTransactions();
+        }}
+        transaction={selectedTransaction}
+        isUpdating={isUpdating}
+        setIsUpdating={setIsUpdating}
+      />
+      </div>
+    </>
   );
 };
 

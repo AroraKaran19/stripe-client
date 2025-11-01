@@ -18,6 +18,20 @@ export const getTransactions = asyncHandler(
     if (req.query.status) filters.status = req.query.status;
     if (req.query.owner_email) filters.owner_email = req.query.owner_email;
     if (req.query.payment_id) filters.payment_id = req.query.payment_id;
+    
+    // Date range filtering (based on admin_date)
+    if (req.query.date_from || req.query.date_to) {
+      filters.admin_date = {};
+      if (req.query.date_from) {
+        filters.admin_date.$gte = new Date(req.query.date_from as string);
+      }
+      if (req.query.date_to) {
+        // Set to end of day for inclusive range
+        const endDate = new Date(req.query.date_to as string);
+        endDate.setHours(23, 59, 59, 999);
+        filters.admin_date.$lte = endDate;
+      }
+    }
 
     const result = await getAllTransactions(page, limit, filters);
 

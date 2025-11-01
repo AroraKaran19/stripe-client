@@ -1,7 +1,7 @@
 import type { Transaction } from "../types/transaction";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
 export interface TransactionsResponse {
   status: string;

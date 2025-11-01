@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import Header from "./components/Header";
 import { cn } from "../../utils";
 import PaymentPage from "./components/PaymentPage";
@@ -11,6 +13,7 @@ export interface FilterContainer {
 }
 
 const TransactionPage = () => {
+  const location = useLocation();
   const tabs = [
     "Payments",
     "Payouts",
@@ -74,8 +77,42 @@ const TransactionPage = () => {
   };
 
   return (
-    <div className="py-4 w-full flex flex-col">
-      <Header />
+    <>
+      <Helmet>
+        <title>Transactions | Visualize & Build ltd. - Stripe</title>
+        <meta
+          name="description"
+          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+        />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Transactions | Visualize & Build ltd. - Stripe" />
+        <meta
+          property="og:description"
+          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+        />
+        <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
+        <meta property="og:site_name" content="Visualize & Build ltd." />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Transactions | Visualize & Build ltd. - Stripe" />
+        <meta
+          name="twitter:description"
+          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+        />
+
+        {/* Additional meta tags */}
+        <meta
+          name="keywords"
+          content="transactions, payments, stripe, financial management, payment history, transaction tracking, payment filters"
+        />
+        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
+      <div className="py-4 w-full flex flex-col">
+        <Header />
       <div className="tab-container mt-1 w-full flex flex-col">
         <div className="tabs flex gap-6 border-b border-gray-300 overflow-x-auto">
           {tabs.map((tab) => (
@@ -114,7 +151,8 @@ const TransactionPage = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

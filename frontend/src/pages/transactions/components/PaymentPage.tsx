@@ -6,6 +6,7 @@ import StatusBadge from "../../../components/transactions/StatusBadge";
 import VisaIcon from "../../../assets/transaction/VisaIcon";
 import { transactionService } from "../../../services/transaction.service";
 import type { Transaction } from "../../../types/transaction";
+import { useNavigate } from "react-router-dom";
 
 const PaymentPage = ({
   filterContainer,
@@ -18,12 +19,19 @@ const PaymentPage = ({
   setActiveFilter: (filter: FilterContainer) => void;
   resetFilter: () => void;
 }) => {
-  const [activeDate, setActiveDate] = useState<Date | null>(null);
+  const navigate = useNavigate();
+  const [activeDate, setActiveDate] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [page] = useState(1);
-  const [limit] = useState(10);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    // Reset to page 1 when filter changes
+    setPage(1);
+  }, [activeFilter, activeDate]);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -36,12 +44,35 @@ const PaymentPage = ({
             ? undefined
             : { status: activeFilter.label.toLowerCase() };
 
+        // Calculate date range if activeDate is set (days to look back)
+        let dateFilters: Record<string, string> | undefined = undefined;
+        if (activeDate !== null && activeDate > 0) {
+          const today = new Date();
+          today.setHours(23, 59, 59, 999); // End of today
+
+          const startDate = new Date(today);
+          startDate.setDate(startDate.getDate() - activeDate);
+          startDate.setHours(0, 0, 0, 0); // Start of that day
+
+          dateFilters = {
+            date_from: startDate.toISOString(),
+            date_to: today.toISOString(),
+          };
+        }
+
+        // Merge all filters
+        const filters = {
+          ...statusFilter,
+          ...dateFilters,
+        };
+
         const response = await transactionService.getAll(
           page,
           limit,
-          statusFilter
+          Object.keys(filters).length > 0 ? filters : undefined
         );
         setTransactions(response.data.transactions);
+        setTotal(response.data.total);
       } catch (err) {
         setError("Failed to load transactions. Please try again.");
         console.error("Error fetching transactions:", err);
@@ -51,7 +82,11 @@ const PaymentPage = ({
     };
 
     fetchTransactions();
-  }, [activeFilter, page, limit]);
+  }, [activeFilter, page, limit, activeDate]);
+
+  const handleTransactionClick = (id: string) => {
+    navigate(`/transactions/${id}`);
+  };
 
   return (
     <div className="payment-page w-full flex flex-col gap-2">
@@ -84,7 +119,7 @@ const PaymentPage = ({
         setActiveDate={setActiveDate}
         resetFilter={resetFilter}
       />
-      <div className="transactions-container w-full overflow-x-auto">
+      <div className="transactions-container w-full overflow-x-auto h-[550px] max-h-[550px] overflow-y-auto">
         <table className="min-w-full">
           <thead>
             <tr className="border-b border-gray-200">
@@ -143,7 +178,11 @@ const PaymentPage = ({
               </tr>
             ) : (
               transactions.map((transaction) => (
-                <tr key={transaction._id} className="border-b border-gray-200">
+                <tr
+                  key={transaction._id}
+                  className="border-b border-gray-200 cursor-pointer"
+                  onClick={() => handleTransactionClick(transaction._id || "")}
+                >
                   <td className="transaction-selection text-left pb-2 px-3 whitespace-nowrap">
                     <input type="checkbox" className="size-4" />
                   </td>
@@ -203,7 +242,16 @@ const PaymentPage = ({
                   </td>
                   <td className="refunded-date text-gray-500 text-sm text-left pb-2 px-3 whitespace-nowrap">
                     {transaction.refunded_date
-                      ? new Date(transaction.refunded_date).toLocaleDateString()
+                      ? new Date(transaction.refunded_date).toLocaleDateString(
+                          "en-US",
+                          {
+                            month: "short",
+                            day: "numeric",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          }
+                        )
                       : "—"}
                   </td>
                   <td className="decline-reason text-gray-500 text-sm text-left pb-2 px-3 whitespace-nowrap">
@@ -214,6 +262,48 @@ const PaymentPage = ({
             )}
           </tbody>
         </table>
+      </div>
+      <div className="pagination-container w-full flex justify-between items-center">
+        <span className="text-sm text-gray-500">
+          {loading
+            ? "Loading..."
+            : total > 0
+            ? `Viewing ${(page - 1) * limit + 1}-${Math.min(
+                page * limit,
+                total
+              )} of ${total} results`
+            : "No results"}
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+            disabled={page === 1 || loading}
+            className={cn(
+              "text-xs px-3 py-1 rounded transition-colors cursor-pointer border border-gray-300",
+              {
+                "text-gray-500 hover:text-gray-700": page > 1 && !loading,
+                "text-gray-300 cursor-not-allowed": page === 1 || loading,
+              }
+            )}
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={page * limit >= total || loading}
+            className={cn(
+              "text-xs px-3 py-1 rounded transition-colors cursor-pointer border border-gray-300",
+              {
+                "text-gray-500 hover:text-gray-700":
+                  page * limit < total && !loading,
+                "text-gray-300 cursor-not-allowed":
+                  page * limit >= total || loading,
+              }
+            )}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );

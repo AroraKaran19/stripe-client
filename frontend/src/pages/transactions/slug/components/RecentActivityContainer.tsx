@@ -5,8 +5,10 @@ import MoneyIcon from "../../../../assets/transaction/MoneyIcon";
 const RecentActivityContainer = ({
   transaction,
 }: {
-  transaction: Transaction;
+  transaction: Transaction | null;
 }) => {
+  if (!transaction) return null;
+
   return (
     <div className="recent-activity w-full mt-5 flex flex-col gap-2 border-b border-gray-200 pb-3">
       <div className="header w-full flex items-center gap-2 border-b border-gray-200 pb-3">
@@ -18,7 +20,7 @@ const RecentActivityContainer = ({
       </div>
       <div className="recent-activity-list mt-2 flex flex-col">
         {transaction.activity_history
-          .slice()
+          ?.slice()
           .reverse()
           .map((activity, index) => (
             <div className="activity-item px-4 mt-2w-full flex items-stretch gap-2">
@@ -30,7 +32,7 @@ const RecentActivityContainer = ({
                     <CheckCircle className="size-3 stroke-3 text-[#378e0e]" />
                   )}
                 </span>
-                {index !== transaction.activity_history.length - 1 && (
+                {index !== (transaction.activity_history?.length || 0) - 1 && (
                   <div className="line bg-gray-200 h-full w-px" />
                 )}
               </div>
@@ -41,17 +43,19 @@ const RecentActivityContainer = ({
                     : "Payment authorized"}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {activity.timestamp.toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  }) +
-                    ", " +
-                    activity.timestamp.toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true,
-                    })}
+                  {activity.timestamp
+                    ? new Date(activity.timestamp).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      }) +
+                      ", " +
+                      new Date(activity.timestamp).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : "—"}
                 </span>
               </div>
             </div>

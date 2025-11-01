@@ -1,6 +1,8 @@
 "use client";
 import { BinocularsIcon, ChevronDownIcon } from "lucide-react";
 import { cloneElement, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { cn } from "../../utils";
 import LineChart from "../../components/ui/charts/homepage/LineChart";
 import HeroSection from "./components/HeroSection";
@@ -13,6 +15,7 @@ interface Graph {
 }
 
 const Homepage = () => {
+  const location = useLocation();
   const [grossVolumeActive, setGrossVolumeActive] = useState(false);
   const [dateActive, setDateActive] = useState(false);
   const graphs: Graph[] = [
@@ -39,7 +42,41 @@ const Homepage = () => {
   ];
 
   return (
-    <div className="w-full min-h-screen flex flex-col">
+    <>
+      <Helmet>
+        <title>Home | Visualize & Build ltd. - Stripe</title>
+        <meta
+          name="description"
+          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+        />
+
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Home | Visualize & Build ltd. - Stripe" />
+        <meta
+          property="og:description"
+          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+        />
+        <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
+        <meta property="og:site_name" content="Visualize & Build ltd." />
+
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Home | Visualize & Build ltd. - Stripe" />
+        <meta
+          name="twitter:description"
+          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+        />
+
+        {/* Additional meta tags */}
+        <meta
+          name="keywords"
+          content="stripe dashboard, payment analytics, financial dashboard, transaction analytics, payment management"
+        />
+        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="robots" content="index, follow" />
+      </Helmet>
+      <div className="w-full min-h-screen flex flex-col">
       <h1 className="text-3xl font-bold py-2 border-b border-[#e5e7eb]">
         Today
       </h1>
@@ -145,6 +182,7 @@ const Homepage = () => {
         ))}
       </div>
     </div>
+    </>
   );
 };
 

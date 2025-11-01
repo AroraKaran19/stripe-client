@@ -20,8 +20,8 @@ const MoreFiltersContainer = ({
 }: {
   activeFilter: FilterContainer;
   resetFilter: () => void;
-  activeDate: Date | null;
-  setActiveDate: (date: Date | null) => void;
+  activeDate: number | null;
+  setActiveDate: (days: number | null) => void;
 }) => {
   const [dateSelectionOpen, setDateSelectionOpen] = useState(false);
   const [currencySelectionOpen, setCurrencySelectionOpen] = useState(false);
@@ -167,9 +167,15 @@ const MoreFiltersContainer = ({
               <div className="flex gap-2 w-full items-center">
                 <Redo className="size-3 text-[#533afd] transform rotate-180 scale-x-[-1]" />
                 <input
-                  type="text"
-                  value={activeDate?.toISOString().split("T")[0]}
-                  onChange={(e) => setActiveDate(new Date(e.target.value))}
+                  type="number"
+                  min="1"
+                  placeholder="10"
+                  value={activeDate ?? ""}
+                  onChange={(e) =>
+                    setActiveDate(
+                      e.target.value ? parseInt(e.target.value) : null
+                    )
+                  }
                   className="w-20 text-sm px-2 py-1 border border-gray-300 rounded-md"
                 />
                 <button className="selection-container w-max px-2 py-1 flex items-center justify-between border border-gray-300 rounded-md cursor-pointer">
@@ -209,9 +215,27 @@ const MoreFiltersContainer = ({
                   </span>
                 </label>
               </div>
-              <button className="selection-container w-full bg-[#533afd] text-white px-2 py-1 flex items-center justify-center rounded-md cursor-pointer">
-                <span className="text-sm font-semibold">Apply</span>
-              </button>
+              <div className="flex gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDate(null);
+                    setDateSelectionOpen(false);
+                  }}
+                  className="selection-container w-full px-2 py-1 flex items-center justify-center border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                >
+                  <span className="text-sm font-semibold text-gray-700">
+                    Clear
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateSelectionOpen(false)}
+                  className="selection-container w-full bg-[#533afd] text-white px-2 py-1 flex items-center justify-center rounded-md cursor-pointer"
+                >
+                  <span className="text-sm font-semibold">Apply</span>
+                </button>
+              </div>
             </div>,
             document.body
           )}
