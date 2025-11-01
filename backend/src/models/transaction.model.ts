@@ -117,6 +117,13 @@ const TransactionSchema = new Schema(
     },
     statement_descriptor: {
       type: String,
+      default: "Visualize & Build ltd.",
+    },
+    customer_id: {
+      type: String,
+    },
+    customer_phone: {
+      type: String,
     },
     risk_evaluation: {
       type: RiskEvaluationSchema,
@@ -127,6 +134,18 @@ const TransactionSchema = new Schema(
     items: {
       type: [ItemSchema],
       default: [],
+    },
+    transferred_to: {
+      type: String,
+    },
+    refunded_date: {
+      type: Date,
+    },
+    decline_reason: {
+      type: String,
+    },
+    admin_date: {
+      type: Date,
     },
   },
   {
@@ -159,6 +178,8 @@ export interface ITransaction extends Document {
   };
   description?: string;
   statement_descriptor?: string;
+  customer_id?: string;
+  customer_phone?: string;
   risk_evaluation?: {
     score?: number;
     level?: "low" | "normal" | "high";
@@ -170,6 +191,10 @@ export interface ITransaction extends Document {
     unit_price?: number;
     total_price?: number;
   }[];
+    transferred_to?: string;
+    refunded_date?: Date;
+    decline_reason?: string;
+    admin_date?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }

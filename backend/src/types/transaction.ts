@@ -27,6 +27,8 @@ export interface Transaction {
   };
   description: string;
   statement_descriptor: string;
+  customer_id?: string;
+  customer_phone?: string;
 
   risk_evaluation: {
     score: number;
@@ -41,6 +43,11 @@ export interface Transaction {
     unit_price: number;
     total_price: number;
   }[];
+
+  transferred_to?: string;
+  refunded_date?: Date;
+  decline_reason?: string;
+  admin_date?: Date;
 
   createdAt?: Date;
   updatedAt?: Date;

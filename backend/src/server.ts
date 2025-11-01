@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     // Connect to MongoDB
-    // await connectDB();
+    await connectDB();
 
     const server = app.listen(PORT, () => {
       console.log(`🚀 Stripe Client Backend Server is running on port ${PORT}`);

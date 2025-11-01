@@ -3,6 +3,7 @@ import Layout from "../layout";
 import { Homepage } from "../pages";
 import TransactionPage from "../pages/transactions/TransactionPage";
 import IndividualTransactionsPage from "../pages/transactions/slug/IndividualTransactionsPage";
+import AdminTransactionManagementPage from "../pages/admin/TransactionPage";
 
 const AppRouter = () => {
   return (
@@ -14,6 +15,10 @@ const AppRouter = () => {
           <Route
             path="/transactions/:id"
             element={<IndividualTransactionsPage />}
+          />
+          <Route
+            path="/admin/transactions"
+            element={<AdminTransactionManagementPage />}
           />
         </Routes>
       </Layout>

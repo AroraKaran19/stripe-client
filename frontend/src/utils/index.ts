@@ -53,7 +53,9 @@ export const createDemoTransaction = (
       cart_last_four: "4242",
     },
     description: "Demo Transaction - Sample Purchase",
-    statement_descriptor: "DEMO PURCHASE",
+    statement_descriptor: "Visualize & Build ltd.",
+    customer_id: "cus_demo_" + Math.random().toString(36).substr(2, 9),
+    customer_phone: "+1 (555) 123-4567",
     risk_evaluation: {
       score: 25,
       level: "low",

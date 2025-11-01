@@ -11,8 +11,8 @@ const PaymentMethodContainer = ({
       <h6 className="text-xl font-bold border-b border-gray-200 pb-3">
         Payment Method
       </h6>
-      <div className="w-full flex">
-        <div className="w-1/2 flex flex-col gap-1">
+      <div className="w-full flex flex-col lg:flex-row">
+        <div className="w-full lg:w-1/2 flex flex-col gap-1">
           <table>
             <tbody>
               <tr>
@@ -66,7 +66,7 @@ const PaymentMethodContainer = ({
             </tbody>
           </table>
         </div>
-        <div className="w-1/2 flex flex-col gap-1">
+        <div className="w-full lg:w-1/2 flex flex-col gap-1">
           <table>
             <tbody>
               <tr>

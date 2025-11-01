@@ -2,11 +2,11 @@ import { ChartColumnIncreasing, Plus } from "lucide-react";
 
 const Header = () => {
   return (
-    <div className="w-full flex">
+    <div className="w-full flex flex-col lg:flex-row">
       <h6 className="text-3xl font-bold text-gray-700">
         <span>Transactions</span>
       </h6>
-      <div className="action-btns ml-auto flex gap-2 items-center">
+      <div className="action-btns mt-2 lg:mt-0 lg:ml-auto flex gap-2 items-center">
         <button className="flex items-center gap-1 bg-[#533afd] text-white rounded-md px-2 py-1 cursor-pointer">
           <Plus className="size-3 stroke-3" />
           <span className="text-sm font-semibold">Create payment</span>
