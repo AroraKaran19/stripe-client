@@ -307,7 +307,7 @@ const Sidebar = () => {
             <DeveloperIcon
               className={cn("size-4", {
                 "text-[#596171]": !isActive("/developers"),
-                "text-[#6b61ff]": isActive("/developers"),
+                "text-[#533afd]": isActive("/developers"),
               })}
             />
           </span>
@@ -316,7 +316,7 @@ const Sidebar = () => {
               "text-sm",
               {
                 "text-[#596171]": !isActive("/developers"),
-                "text-[#6b61ff] font-semibold": isActive("/developers"),
+                "text-[#533afd] font-semibold": isActive("/developers"),
               },
               {
                 hidden: isCollapsed,

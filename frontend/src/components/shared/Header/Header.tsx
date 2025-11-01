@@ -60,7 +60,7 @@ const Header = () => {
                 "before:max-h-6 before:-left-1.5 before:top-1/2 before:-translate-y-1/2",
                 "before:rounded-md before:pointer-events-none before:p-1.5 before:z-[-1] before:transition-all before:duration-300 before:ease-in-out",
                 {
-                  "hover:before:!bg-[#675dff]/10":
+                  "hover:before:!bg-[#533afd]/10":
                     btn.href && isActive(btn.href),
                 }
               )}
@@ -73,7 +73,7 @@ const Header = () => {
                   {cloneElement(btn.icon as React.ReactElement<SVGSVGElement>, {
                     className: cn("size-4 shrink-0", {
                       "!text-[#474e5a]": !isActive(btn.href),
-                      "!text-[#675dff]": isActive(btn.href),
+                      "!text-[#533afd]": isActive(btn.href),
                     }),
                   })}
                 </Link>
@@ -90,7 +90,7 @@ const Header = () => {
           );
         })}
         <button className="p-1 rounded-full cursor-pointer hover:bg-black/10 transition-all duration-300 ease-in-out">
-          <div className="p-1 rounded-full bg-[#675dff]">
+          <div className="p-1 rounded-full bg-[#533afd]">
             <CreateIcon className="size-3 text-white" />
           </div>
         </button>

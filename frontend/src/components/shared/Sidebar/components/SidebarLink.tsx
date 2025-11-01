@@ -28,7 +28,7 @@ const SidebarLink = ({
           "before:rounded-md before:pointer-events-none before:p-1.5 before:z-[-1] before:transition-all before:duration-300 before:ease-in-out",
           {
             "hover:before:!bg-black/10": !isCollapsed,
-            "hover:before:!bg-[#6b61ff]/10": isCollapsed,
+            "hover:before:!bg-[#533afd]/10": isCollapsed,
           }
         )}
       >
@@ -39,14 +39,14 @@ const SidebarLink = ({
         >
           <span
             className={cn("p-1", {
-              "bg-[#6b61ff]/10 rounded-sm": isCollapsed && isActive(link.href),
+              "bg-[#533afd]/10 rounded-sm": isCollapsed && isActive(link.href),
             })}
           >
             {link.icon ? (
               cloneElement(link.icon as React.ReactElement<SVGSVGElement>, {
                 className: cn("size-4 shrink-0", {
                   "!text-[#9097a5]": !isActive(link.href),
-                  "!text-[#6b61ff]": isActive(link.href),
+                  "!text-[#533afd]": isActive(link.href),
                 }),
               })
             ) : (
@@ -58,7 +58,7 @@ const SidebarLink = ({
               "text-sm whitespace-nowrap",
               {
                 "!text-black": !isActive(link.href),
-                "!text-[#6b61ff] font-semibold": isActive(link.href),
+                "!text-[#533afd] font-semibold": isActive(link.href),
               },
               {
                 hidden: isCollapsed,
