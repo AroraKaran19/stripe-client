@@ -42,7 +42,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       </div>
       <div className="flex-1 mx-auto max-w-7xl px-4 min-w-0">
         <Header />
-        <main className="w-full min-h-[calc(100vh-60px)] overflow-x-auto min-w-0">
+        <main className="w-full min-h-[calc(100vh-60px)] min-w-0">
           {children}
         </main>
       </div>

@@ -51,9 +51,10 @@ const Header = () => {
     <header className="w-full h-15 py-3 flex items-center gap-2">
       <Searchbar />
       <div className="action-btns ml-auto flex gap-5 items-center">
-        {actionBtns.map((btn) => {
+        {actionBtns.map((btn, index) => {
           return (
             <div
+              key={btn.href || `btn-${index}`}
               className={cn(
                 "size-5 flex items-center justify-center hover:before:!bg-black/10",
                 "relative before:absolute before:w-[calc(100%+12px)] before:h-[calc(100%+12px)]",
