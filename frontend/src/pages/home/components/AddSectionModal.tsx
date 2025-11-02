@@ -1,5 +1,4 @@
 import { X } from "lucide-react";
-import { cn } from "../../../utils";
 
 export type SectionType =
   | "payments"
@@ -124,4 +123,6 @@ const AddSectionModal = ({
 };
 
 export default AddSectionModal;
+
+
 

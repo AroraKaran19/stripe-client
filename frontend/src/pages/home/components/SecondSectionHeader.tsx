@@ -16,7 +16,7 @@ interface SecondSectionHeaderProps {
   compareOption?: string;
   customDateRange?: DateRange;
   onDateRangeChange: (range: string) => void;
-  onCustomDateRangeChange: (range: DateRange) => void;
+  onCustomDateRangeChange: (range: DateRange | undefined) => void;
   onFrequencyChange: (freq: string) => void;
   onCompareChange?: (option: string) => void;
   onAddClick?: () => void;
@@ -236,7 +236,7 @@ const SecondSectionHeader = ({
                     if (predefinedMatch) {
                       // Use predefined range
                       onDateRangeChange(predefinedMatch.value);
-                      setCustomDateRange(undefined);
+                      onCustomDateRangeChange(undefined);
                     } else {
                       // Custom range
                       onCustomDateRangeChange(range);

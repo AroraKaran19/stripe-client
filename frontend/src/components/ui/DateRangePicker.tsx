@@ -131,7 +131,7 @@ const DateRangePicker = ({
     setRightMonth(endMonth.getTime() === nowMonth.getTime() ? now : end);
   };
 
-  const handleDateClick = (date: Date, isLeftCalendar: boolean) => {
+  const handleDateClick = (date: Date, _isLeftCalendar: boolean) => {
     if (!startDate || (startDate && endDate && startDate.getTime() !== endDate.getTime())) {
       // Starting new selection
       setStartDate(date);

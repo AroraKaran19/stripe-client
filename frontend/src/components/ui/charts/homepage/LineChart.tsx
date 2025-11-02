@@ -151,6 +151,9 @@ const LineChart = ({ currentData, previousData, currency = "US$" }: LineChartPro
         callbacks: {
           label: (context) => {
             const value = context.parsed.y;
+            if (value === null || value === undefined) {
+              return '';
+            }
             if (currency) {
               return `${currency}${value.toFixed(2)}`;
             }
