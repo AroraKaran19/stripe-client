@@ -33,7 +33,10 @@ export const getTransactions = asyncHandler(
       }
     }
 
-    const result = await getAllTransactions(page, limit, filters);
+    // Search query - searches across multiple fields
+    const searchQuery = req.query.search as string;
+    
+    const result = await getAllTransactions(page, limit, filters, searchQuery);
 
     res.status(200).json({
       status: "success",

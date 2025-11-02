@@ -4,6 +4,7 @@ import { Homepage } from "../pages";
 import TransactionPage from "../pages/transactions/TransactionPage";
 import IndividualTransactionsPage from "../pages/transactions/slug/IndividualTransactionsPage";
 import AdminTransactionManagementPage from "../pages/admin/TransactionPage";
+import AdminHomePage from "../pages/admin/HomePage";
 import NotFoundPage from "../pages/404/NotFoundPage";
 
 const AppRouter = () => {
@@ -20,6 +21,10 @@ const AppRouter = () => {
           <Route
             path="/admin/transactions"
             element={<AdminTransactionManagementPage />}
+          />
+          <Route
+            path="/admin/home"
+            element={<AdminHomePage />}
           />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>

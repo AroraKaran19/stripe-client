@@ -3,6 +3,7 @@ import cors from "cors";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import transactionRoutes from "./routes/transaction.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import analyticsSnapshotRoutes from "./routes/analytics-snapshot.routes";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get("/health", (req, res) => {
 // API Routes
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/analytics-snapshots", analyticsSnapshotRoutes);
 
 // Root route
 app.get("/", (req, res) => {

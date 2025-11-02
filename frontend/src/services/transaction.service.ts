@@ -22,13 +22,19 @@ export const transactionService = {
   getAll: async (
     page: number = 1,
     limit: number = 10,
-    filters?: Record<string, any>
+    filters?: Record<string, any>,
+    search?: string
   ): Promise<TransactionsResponse> => {
     const params = new URLSearchParams();
     params.append("page", page.toString());
     params.append("limit", limit.toString());
 
-    // Add filters to query params
+    // Add search query if provided
+    if (search && search.trim()) {
+      params.append("search", search.trim());
+    }
+
+    // Add filters to query params (excluding search)
     if (filters) {
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== "") {
