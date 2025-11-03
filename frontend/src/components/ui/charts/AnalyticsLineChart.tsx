@@ -62,10 +62,8 @@ const AnalyticsLineChart = ({
     }
   };
 
-  // Merge and sort all dates
-  const allDates = Array.from(
-    new Set([...currentData.map((d) => d.date), ...previousData.map((d) => d.date)])
-  ).sort();
+  // Use ONLY current period dates for x-axis labels (overlay approach)
+  const allDates = currentData.map(d => d.date).sort();
 
   // Create labels - only show first and last date on X-axis
   const labels = allDates.map(formatDate);
@@ -75,9 +73,13 @@ const AnalyticsLineChart = ({
     (date) => currentData.find((d) => d.date === date)?.value || 0
   );
 
-  const previousValues = allDates.map(
-    (date) => previousData.find((d) => d.date === date)?.value || 0
-  );
+  // For previous data, we need to shift the dates to match current period's timeline
+  // If current is Sep 26-Oct 2 and previous is Sep 19-Sep 25, we display previous data
+  // over the same Sep 26-Oct 2 dates on the chart (overlay style)
+  const previousValues = allDates.map((_, index) => {
+    // Use the same index position from previous data (which has same length)
+    return previousData[index]?.value || 0;
+  });
 
   const maxValue = Math.max(
     ...currentValues,

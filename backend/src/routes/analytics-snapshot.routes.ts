@@ -23,3 +23,4 @@ router.get("/range", getSnapshotsByRange);
 export default router;
 
 
+

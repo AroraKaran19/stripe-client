@@ -39,16 +39,7 @@ const AdminHomePage = () => {
   const [dateRangePickerPosition, setDateRangePickerPosition] = useState({ top: 0, left: 0 });
   const dateRangeButtonRef = useRef<HTMLButtonElement>(null);
   const dateRangePickerRef = useRef<HTMLDivElement>(null);
-  const [entryMethod, setEntryMethod] = useState<"daily" | "hourly">("daily");
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
-  const [entryMethodDropdownOpen, setEntryMethodDropdownOpen] = useState(false);
-  const [hourDropdownOpen, setHourDropdownOpen] = useState(false);
-  const entryMethodButtonRef = useRef<HTMLButtonElement>(null);
-  const hourButtonRef = useRef<HTMLButtonElement>(null);
-  const entryMethodDropdownRef = useRef<HTMLDivElement>(null);
-  const hourDropdownRef = useRef<HTMLDivElement>(null);
-  const [entryMethodDropdownPosition, setEntryMethodDropdownPosition] = useState({ top: 0, left: 0 });
-  const [hourDropdownPosition, setHourDropdownPosition] = useState({ top: 0, left: 0 });
+  // Entry method dropdown removed; default view uses daily totals
   const [snapshots, setSnapshots] = useState<AnalyticsSnapshot[]>([]);
   const [calculatedAnalytics, setCalculatedAnalytics] = useState<any>(null);
   const [transactionCounts, setTransactionCounts] = useState<{
@@ -162,7 +153,7 @@ const AdminHomePage = () => {
 
   useEffect(() => {
     fetchData();
-  }, [dateRange, entryMethod, selectedHour]);
+  }, [dateRange]);
 
   const updateDateRangePosition = () => {
     if (dateRangeButtonRef.current) {
@@ -174,25 +165,7 @@ const AdminHomePage = () => {
     }
   };
 
-  const updateEntryMethodDropdownPosition = () => {
-    if (entryMethodButtonRef.current) {
-      const rect = entryMethodButtonRef.current.getBoundingClientRect();
-      setEntryMethodDropdownPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-    }
-  };
-
-  const updateHourDropdownPosition = () => {
-    if (hourButtonRef.current) {
-      const rect = hourButtonRef.current.getBoundingClientRect();
-      setHourDropdownPosition({
-        top: rect.bottom + 4,
-        left: rect.left,
-      });
-    }
-  };
+  // Removed entry method and hour dropdown positioning
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -205,36 +178,17 @@ const AdminHomePage = () => {
       ) {
         setDateRangePickerOpen(false);
       }
-      // Entry method dropdown
-      if (
-        entryMethodDropdownRef.current &&
-        !entryMethodDropdownRef.current.contains(event.target as Node) &&
-        entryMethodButtonRef.current &&
-        !entryMethodButtonRef.current.contains(event.target as Node)
-      ) {
-        setEntryMethodDropdownOpen(false);
-      }
-      // Hour dropdown
-      if (
-        hourDropdownRef.current &&
-        !hourDropdownRef.current.contains(event.target as Node) &&
-        hourButtonRef.current &&
-        !hourButtonRef.current.contains(event.target as Node)
-      ) {
-        setHourDropdownOpen(false);
-      }
+      // Entry method and hour dropdown removed
     };
 
     const handleScroll = () => {
       if (dateRangePickerOpen) updateDateRangePosition();
-      if (entryMethodDropdownOpen) updateEntryMethodDropdownPosition();
-      if (hourDropdownOpen) updateHourDropdownPosition();
+      // Removed
     };
 
     const handleResize = () => {
       if (dateRangePickerOpen) updateDateRangePosition();
-      if (entryMethodDropdownOpen) updateEntryMethodDropdownPosition();
-      if (hourDropdownOpen) updateHourDropdownPosition();
+      // Removed
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -246,17 +200,9 @@ const AdminHomePage = () => {
       window.removeEventListener("scroll", handleScroll, true);
       window.removeEventListener("resize", handleResize);
     };
-  }, [dateRangePickerOpen, entryMethodDropdownOpen, hourDropdownOpen]);
+  }, [dateRangePickerOpen]);
 
-  // Reset selected hour when switching to daily
-  useEffect(() => {
-    if (entryMethod === "daily") {
-      setSelectedHour(null);
-    } else if (entryMethod === "hourly" && selectedHour === null) {
-      // Default to first hour (0) when switching to hourly
-      setSelectedHour(0);
-    }
-  }, [entryMethod]);
+  // Removed selected hour logic
 
   const getMetricValue = (metric: string): number => {
     // Filter manual snapshots for this metric within the date range
@@ -279,29 +225,7 @@ const AdminHomePage = () => {
       manualEntryMap.set(dateKey, s);
     });
 
-    // If hourly mode and hour is selected
-    if (entryMethod === "hourly" && selectedHour !== null) {
-      // Filter snapshots that have hourly breakdown data for this hour
-      const hourlySnapshots = manualSnapshots.filter((s) => {
-        if (s.hourlyBreakdown && typeof s.hourlyBreakdown === 'object') {
-          const hourValue = (s.hourlyBreakdown as any)[selectedHour];
-          return hourValue !== undefined && hourValue !== null;
-        }
-        return false;
-      });
-
-      // Sum hourly values for selected hour across all dates in range
-      if (hourlySnapshots.length > 0) {
-        const manualTotal = hourlySnapshots.reduce((sum, s) => {
-          const hourValue = (s.hourlyBreakdown as any)?.[selectedHour] || 0;
-          return sum + hourValue;
-        }, 0);
-        return manualTotal;
-      }
-      
-      // For hourly mode without manual data, return 0
-      return 0;
-    } else if (entryMethod === "daily") {
+    {
       // Calculate all days in the range
       const daysInRange: string[] = [];
       const currentDate = new Date(startDate);
@@ -380,8 +304,7 @@ const AdminHomePage = () => {
     }
 
     // No manual entries - use calculated value from analytics
-    // Note: Calculated analytics don't have hourly breakdown, so only use for daily mode
-    if (!calculatedAnalytics || entryMethod === "hourly") return 0;
+    if (!calculatedAnalytics) return 0;
 
     switch (metric) {
       case "gross_volume":
@@ -563,150 +486,9 @@ const AdminHomePage = () => {
                   )}
             </div>
 
-            {/* Entry Method */}
-            <div className="relative shrink-0 z-[100]">
-              <button
-                ref={entryMethodButtonRef}
-                onClick={() => {
-                    if (!entryMethodDropdownOpen) {
-                      updateEntryMethodDropdownPosition();
-                    }
-                    setEntryMethodDropdownOpen(!entryMethodDropdownOpen);
-                    setHourDropdownOpen(false);
-                    setDateRangePickerOpen(false);
-                  }}
-                  className="flex items-center gap-1 p-1 text-[#353a44] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[#f5f6f8] rounded-full border border-[#e5e7eb] shrink-0"
-                >
-                  <span className="text-xs font-semibold border-r border-[#e5e7eb] pr-1">
-                    Entry method
-                  </span>
-                  <span className="text-xs font-semibold text-[#533afd]">
-                    {entryMethod === "daily" ? "Daily Totals" : "Hourly Breakdown"}
-                  </span>
-                  <ChevronDownIcon
-                    className={cn(
-                      "size-3 stroke-3 transition-transform duration-200",
-                      entryMethodDropdownOpen && "rotate-180"
-                    )}
-                  />
-                </button>
-                {entryMethodDropdownOpen &&
-                  createPortal(
-                    <div
-                      ref={entryMethodDropdownRef}
-                      className="fixed bg-white border border-gray-200 rounded-md shadow-lg z-[10000] min-w-[160px]"
-                      style={{
-                        top: `${entryMethodDropdownPosition.top}px`,
-                        left: `${entryMethodDropdownPosition.left}px`,
-                      }}
-                    >
-                      <button
-                        onClick={() => {
-                          setEntryMethod("daily");
-                          setEntryMethodDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-sm font-semibold hover:bg-[#f5f6f8] transition-colors flex items-center justify-between",
-                          {
-                            "text-[#533afd] bg-[#f5f6f8]": entryMethod === "daily",
-                            "text-[#353a44]": entryMethod !== "daily",
-                          }
-                        )}
-                      >
-                        <span>Daily Totals</span>
-                        {entryMethod === "daily" && (
-                          <span className="text-[#533afd]">✓</span>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEntryMethod("hourly");
-                          setEntryMethodDropdownOpen(false);
-                        }}
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-sm font-semibold hover:bg-[#f5f6f8] transition-colors flex items-center justify-between",
-                          {
-                            "text-[#533afd] bg-[#f5f6f8]": entryMethod === "hourly",
-                            "text-[#353a44]": entryMethod !== "hourly",
-                          }
-                        )}
-                      >
-                        <span>Hourly Breakdown</span>
-                        {entryMethod === "hourly" && (
-                          <span className="text-[#533afd]">✓</span>
-                        )}
-                      </button>
-                    </div>,
-                    document.body
-                  )}
-            </div>
+            {/* Entry Method dropdown removed */}
 
-            {/* Hour Selector (only shown when hourly is selected) */}
-            {entryMethod === "hourly" && (
-              <div className="relative shrink-0 z-[100]">
-                <button
-                  ref={hourButtonRef}
-                  onClick={() => {
-                      if (!hourDropdownOpen) {
-                        updateHourDropdownPosition();
-                      }
-                      setHourDropdownOpen(!hourDropdownOpen);
-                      setEntryMethodDropdownOpen(false);
-                      setDateRangePickerOpen(false);
-                    }}
-                    className="flex items-center gap-1 p-1 text-[#353a44] cursor-pointer transition-all duration-200 ease-in-out hover:bg-[#f5f6f8] rounded-full border border-[#e5e7eb] shrink-0"
-                  >
-                    <span className="text-xs font-semibold border-r border-[#e5e7eb] pr-1">
-                      Hour
-                    </span>
-                    <span className="text-xs font-semibold text-[#533afd]">
-                      {selectedHour !== null
-                        ? `${selectedHour.toString().padStart(2, "0")}:00`
-                        : "Select"}
-                    </span>
-                    <ChevronDownIcon
-                      className={cn(
-                        "size-3 stroke-3 transition-transform duration-200",
-                        hourDropdownOpen && "rotate-180"
-                      )}
-                    />
-                  </button>
-                  {hourDropdownOpen &&
-                    createPortal(
-                      <div
-                        ref={hourDropdownRef}
-                        className="fixed bg-white border border-[#e5e7eb] rounded-md shadow-lg z-[10000] min-w-[120px] max-h-64 overflow-y-auto"
-                        style={{
-                          top: `${hourDropdownPosition.top}px`,
-                          left: `${hourDropdownPosition.left}px`,
-                        }}
-                      >
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => {
-                              setSelectedHour(i);
-                              setHourDropdownOpen(false);
-                            }}
-                            className={cn(
-                              "w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[#f5f6f8] transition-colors flex items-center justify-between",
-                              {
-                                "text-[#533afd] bg-[#f5f6f8]": selectedHour === i,
-                                "text-[#353a44]": selectedHour !== i,
-                              }
-                            )}
-                          >
-                            <span>{i.toString().padStart(2, "0")}:00</span>
-                            {selectedHour === i && (
-                              <span className="text-[#533afd]">✓</span>
-                            )}
-                          </button>
-                        ))}
-                      </div>,
-                      document.body
-                    )}
-              </div>
-            )}
+            {/* Hour selector removed */}
           </div>
         </div>
 
@@ -757,15 +539,10 @@ const AdminHomePage = () => {
                   {formatValue(metric.value, metric.format)}
                 </div>
 
-                {/* Date Range, Hour, and Source */}
+                {/* Date Range and Source */}
                 <div className="flex flex-col gap-1 mt-2">
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>{formatDateRange(dateRange)}</span>
-                    {entryMethod === "hourly" && selectedHour !== null && (
-                      <span className="text-xs text-gray-600">
-                        Hour: {selectedHour.toString().padStart(2, "0")}:00
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center justify-end">
                     <span
@@ -790,8 +567,8 @@ const AdminHomePage = () => {
           <AnalysisReport
             metrics={metricsWithValues}
             dateRange={dateRange}
-            entryMethod={entryMethod}
-            selectedHour={selectedHour}
+            entryMethod={"daily"}
+            selectedHour={null}
           />
         )}
 
@@ -805,9 +582,9 @@ const AdminHomePage = () => {
               metricsWithValues.find((m) => m.metric === editingMetric)!
             }
             date={dateRange.start}
-            entryMethod={entryMethod}
+            entryMethod={"daily"}
             dateRange={dateRange}
-            selectedHour={selectedHour}
+            selectedHour={null}
           />
         )}
       </div>

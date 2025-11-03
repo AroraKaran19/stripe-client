@@ -80,6 +80,8 @@ const SingleDatePicker = ({
     const daysInMonth = getDaysInMonth(monthDate);
     const firstDay = getFirstDayOfMonth(monthDate);
     const days = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
@@ -91,16 +93,21 @@ const SingleDatePicker = ({
       const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), day);
       const isSelected = isDateSelected(date);
       const isToday = date.toDateString() === new Date().toDateString();
+      const isFuture = date.getTime() > today.getTime();
 
       days.push(
         <button
           key={day}
-          onClick={() => handleDateClick(date)}
+          onClick={() => {
+            if (!isFuture) handleDateClick(date);
+          }}
+          disabled={isFuture}
           className={cn(
             "w-8 h-8 text-xs font-medium rounded-md transition-colors",
             {
               "bg-[#533afd] text-white": isSelected,
-              "text-[#353a44] hover:bg-gray-100": !isSelected,
+              "text-[#353a44] hover:bg-gray-100": !isSelected && !isFuture,
+              "text-gray-300 cursor-not-allowed": isFuture,
               "font-semibold": isToday && !isSelected,
             }
           )}
@@ -115,8 +122,17 @@ const SingleDatePicker = ({
 
   const navigateMonth = (direction: "prev" | "next") => {
     const newMonth = new Date(displayMonth);
-    newMonth.setMonth(newMonth.getMonth() + (direction === "next" ? 1 : -1));
-    setDisplayMonth(newMonth);
+    const delta = direction === "next" ? 1 : -1;
+    newMonth.setMonth(newMonth.getMonth() + delta);
+    // Prevent navigating to months after the current month
+    const now = new Date();
+    const candidate = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (candidate.getTime() > currentMonth.getTime()) {
+      setDisplayMonth(currentMonth);
+    } else {
+      setDisplayMonth(newMonth);
+    }
   };
 
   const handleApply = () => {
@@ -139,8 +155,12 @@ const SingleDatePicker = ({
           onChange={(e) => {
             const parsed = parseDateInput(e.target.value);
             if (parsed) {
-              setSelectedDate(parsed);
-              setDisplayMonth(parsed);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              // Clamp to today if future
+              const safe = parsed.getTime() > today.getTime() ? today : parsed;
+              setSelectedDate(safe);
+              setDisplayMonth(safe);
             }
           }}
           className="w-full px-2 py-1.5 text-xs border border-[#533afd] rounded-md focus:outline-none focus:ring-1 focus:ring-[#533afd]"

@@ -7,6 +7,7 @@ interface DateRangePickerProps {
   onClose: () => void;
   onApply: (range: { start: Date; end: Date; label: string }) => void;
   currentRange?: { start: Date; end: Date; label: string };
+  onPreview?: (range: { start: Date; end: Date; label: string }) => void;
 }
 
 const predefinedRanges = [
@@ -23,6 +24,7 @@ const DateRangePicker = ({
   onClose,
   onApply,
   currentRange,
+  onPreview,
 }: DateRangePickerProps) => {
   const [selectedRange, setSelectedRange] = useState<string | null>(null);
   const [startDate, setStartDate] = useState<Date>(
@@ -129,9 +131,20 @@ const DateRangePicker = ({
     setLeftMonth(new Date(start));
     // Right month shows current month if end date is in current month, otherwise show end date's month
     setRightMonth(endMonth.getTime() === nowMonth.getTime() ? now : end);
+
+    // Emit preview so the parent can show the chosen label before apply
+    if (onPreview) {
+      onPreview({ start, end, label: predefinedRanges.find(r => r.value === value)?.label || "" });
+    }
   };
 
   const handleDateClick = (date: Date, _isLeftCalendar: boolean) => {
+    // Disallow selecting future dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date.getTime() > today.getTime()) {
+      return;
+    }
     if (!startDate || (startDate && endDate && startDate.getTime() !== endDate.getTime())) {
       // Starting new selection
       setStartDate(date);
@@ -151,6 +164,10 @@ const DateRangePicker = ({
       setStartDate(date);
       setEndDate(date);
       setSelectedRange(null);
+    }
+
+    if (onPreview) {
+      onPreview({ start: date, end: date, label: `${formatDateInput(date)} - ${formatDateInput(date)}` });
     }
   };
 
@@ -172,6 +189,8 @@ const DateRangePicker = ({
     const daysInMonth = getDaysInMonth(monthDate);
     const firstDay = getFirstDayOfMonth(monthDate);
     const days = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
@@ -184,17 +203,22 @@ const DateRangePicker = ({
       const isSelected = isDateSelected(date);
       const inRange = isDateInRange(date);
       const isToday = date.toDateString() === new Date().toDateString();
+      const isFuture = date.getTime() > today.getTime();
 
       days.push(
         <button
           key={day}
-          onClick={() => handleDateClick(date, isLeftCalendar)}
+          onClick={() => {
+            if (!isFuture) handleDateClick(date, isLeftCalendar);
+          }}
+          disabled={isFuture}
           className={cn(
             "w-8 h-8 text-xs font-medium rounded-md transition-colors",
             {
               "bg-[#533afd] text-white": isSelected,
-              "bg-[#533afd]/10 text-[#533afd]": inRange && !isSelected,
-              "text-[#353a44] hover:bg-gray-100": !inRange && !isSelected,
+              "bg-[#533afd]/10 text-[#533afd]": inRange && !isSelected && !isFuture,
+              "text-[#353a44] hover:bg-gray-100": !inRange && !isSelected && !isFuture,
+              "text-gray-300 cursor-not-allowed": isFuture,
               "font-semibold": isToday && !isSelected,
             }
           )}
@@ -208,10 +232,18 @@ const DateRangePicker = ({
   };
 
   const navigateMonth = (direction: "prev" | "next", isLeftCalendar: boolean) => {
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     if (isLeftCalendar) {
       const newMonth = new Date(leftMonth);
       newMonth.setMonth(newMonth.getMonth() + (direction === "next" ? 1 : -1));
+      // Prevent moving beyond current month
+      const candidate = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      if (candidate.getTime() > currentMonth.getTime()) {
+        setLeftMonth(currentMonth);
+      } else {
       setLeftMonth(newMonth);
+      }
       // If right month becomes the same as left, advance right by one month
       if (newMonth.getMonth() === rightMonth.getMonth() && 
           newMonth.getFullYear() === rightMonth.getFullYear()) {
@@ -222,7 +254,13 @@ const DateRangePicker = ({
     } else {
       const newMonth = new Date(rightMonth);
       newMonth.setMonth(newMonth.getMonth() + (direction === "next" ? 1 : -1));
-      setRightMonth(newMonth);
+      // Prevent moving beyond current month
+      const candidate = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
+      if (candidate.getTime() > currentMonth.getTime()) {
+        setRightMonth(currentMonth);
+      } else {
+        setRightMonth(newMonth);
+      }
       // If left month becomes the same as right, move left back by one month
       if (newMonth.getMonth() === leftMonth.getMonth() && 
           newMonth.getFullYear() === leftMonth.getFullYear()) {
@@ -240,10 +278,9 @@ const DateRangePicker = ({
     const label =
       predefinedRanges.find((r) => r.value === selectedRange)?.label ||
       `${formatDateInput(startDate)} - ${formatDateInput(endDate)}`;
-    // Close modal first
-    onClose();
-    // Then apply the changes
+    // Apply changes before closing to avoid any race with unmounting
     onApply({ start: startDate, end: endDate, label });
+    onClose();
   };
 
   const handleClear = () => {
@@ -299,7 +336,14 @@ const DateRangePicker = ({
                   value={formatDateInput(startDate)}
                   onChange={(e) => {
                     const parsed = parseDateInput(e.target.value);
-                    if (parsed) setStartDate(parsed);
+                    if (parsed) {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      if (parsed.getTime() <= today.getTime()) setStartDate(parsed);
+                    }
+                    if (onPreview) {
+                      onPreview({ start: startDate, end: endDate, label: `${formatDateInput(startDate)} - ${formatDateInput(endDate)}` });
+                    }
                   }}
                   className="w-full px-2 py-1.5 text-xs border border-[#533afd] rounded-md focus:outline-none focus:ring-1 focus:ring-[#533afd]"
                   placeholder="DD / MM / YYYY"
@@ -314,7 +358,14 @@ const DateRangePicker = ({
                   value={formatDateInput(endDate)}
                   onChange={(e) => {
                     const parsed = parseDateInput(e.target.value);
-                    if (parsed) setEndDate(parsed);
+                    if (parsed) {
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      if (parsed.getTime() <= today.getTime()) setEndDate(parsed);
+                    }
+                    if (onPreview) {
+                      onPreview({ start: startDate, end: endDate, label: `${formatDateInput(startDate)} - ${formatDateInput(endDate)}` });
+                    }
                   }}
                   className="w-full px-2 py-1.5 text-xs border border-[#533afd] rounded-md focus:outline-none focus:ring-1 focus:ring-[#533afd]"
                   placeholder="DD / MM / YYYY"

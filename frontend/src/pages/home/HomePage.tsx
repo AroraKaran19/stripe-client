@@ -32,18 +32,29 @@ const Homepage = () => {
   const [metricDropdownPosition, setMetricDropdownPosition] = useState({ top: 0, left: 0 });
   const metricButtonRef = useRef<HTMLButtonElement>(null);
   const metricDropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedCompareDate, setSelectedCompareDate] = useState<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  // Top chart: selected single day (hourly)
+  const [topSelectedDate, setTopSelectedDate] = useState<Date>(new Date());
   const [compareDatePickerOpen, setCompareDatePickerOpen] = useState(false);
   const [compareDatePickerPosition, setCompareDatePickerPosition] = useState({ top: 0, left: 0 });
   const compareDateButtonRef = useRef<HTMLButtonElement>(null);
   const compareDatePickerRef = useRef<HTMLDivElement>(null);
-  const [dateRange, setDateRange] = useState("last_7_days");
-  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
-  const [frequency, setFrequency] = useState("daily");
-  const [compareOption, setCompareOption] = useState("previous_period");
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Overview section analytics state (decoupled from top chart)
+  const [overviewDateRange, setOverviewDateRange] = useState<DateRange>(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 6); // Last 7 days
+    return {
+      start,
+      end,
+      label: "Last 7 days",
+    };
+  });
+  const [overviewFrequency, setOverviewFrequency] = useState("daily");
+  const [overviewCompareOption, setOverviewCompareOption] = useState<string | null>(null);
+  const [overviewAnalytics, setOverviewAnalytics] = useState<AnalyticsData | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
   const [sections, setSections] = useState<SectionType[]>([
     "payments",
     "grossVolume",
@@ -57,29 +68,68 @@ const Homepage = () => {
   const [draggedSection, setDraggedSection] = useState<SectionType | null>(null);
   const [dragOverSection, setDragOverSection] = useState<SectionType | null>(null);
 
+  // Fetch analytics for the top chart only (single selected day, hourly)
   useEffect(() => {
     const fetchAnalytics = async () => {
-      setLoading(true);
-      setError(null);
+      setOverviewLoading(true);
+      setOverviewError(null);
       try {
+        const start = new Date(topSelectedDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(topSelectedDate);
+        end.setHours(23, 59, 59, 999);
+
         const response = await analyticsService.getAnalytics(
-          dateRange,
-          frequency,
-          customDateRange?.start,
-          customDateRange?.end,
-          compareOption
+          "custom",
+          "hourly",
+          start,
+          end,
+          "previous_period"
         );
-        setAnalytics(response.data);
+        setOverviewAnalytics(response.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch analytics");
+        setOverviewError(err instanceof Error ? err.message : "Failed to fetch analytics");
         console.error("Error fetching analytics:", err);
       } finally {
-        setLoading(false);
+        setOverviewLoading(false);
       }
     };
 
     fetchAnalytics();
-  }, [dateRange, frequency, customDateRange, compareOption]);
+  }, [topSelectedDate]);
+
+  // Fetch analytics for the overview section (separate state and request)
+  useEffect(() => {
+    const fetchOverview = async () => {
+      setOverviewLoading(true);
+      setOverviewError(null);
+      try {
+        // For overview, check if single day to auto-enable hourly
+        const isSingleDay =
+          overviewDateRange.start.getFullYear() === overviewDateRange.end.getFullYear() &&
+          overviewDateRange.start.getMonth() === overviewDateRange.end.getMonth() &&
+          overviewDateRange.start.getDate() === overviewDateRange.end.getDate();
+
+        const effectiveFrequency = isSingleDay ? "hourly" : overviewFrequency;
+
+        const response = await analyticsService.getAnalytics(
+          "custom",
+          effectiveFrequency,
+          overviewDateRange.start,
+          overviewDateRange.end,
+          overviewCompareOption || "none"
+        );
+        setOverviewAnalytics(response.data);
+      } catch (err) {
+        setOverviewError(err instanceof Error ? err.message : "Failed to fetch analytics");
+        console.error("Error fetching overview analytics:", err);
+      } finally {
+        setOverviewLoading(false);
+      }
+    };
+
+    fetchOverview();
+  }, [overviewDateRange, overviewFrequency, overviewCompareOption]);
 
   const metricOptions = [
     { value: "gross_volume", label: "Gross volume" },
@@ -89,30 +139,30 @@ const Homepage = () => {
   ];
 
   const getCurrentMetricValue = () => {
-    if (!analytics) return 0;
+    if (!overviewAnalytics) return 0;
     switch (selectedMetric) {
       case "gross_volume":
-        return analytics.grossVolume.current;
+        return overviewAnalytics.grossVolume.current;
       case "net_volume":
-        return analytics.netVolume.current;
+        return overviewAnalytics.netVolume.current;
       case "new_customers":
-        return analytics.newCustomers.current;
+        return overviewAnalytics.newCustomers.current;
       case "successful_payments":
-        return analytics.payments.filter(p => p.status === "succeeded").length;
+        return overviewAnalytics.payments.filter((p: any) => p.status === "succeeded").length;
       default:
         return 0;
     }
   };
 
   const getPreviousMetricValue = () => {
-    if (!analytics) return 0;
+    if (!overviewAnalytics) return 0;
     switch (selectedMetric) {
       case "gross_volume":
-        return analytics.grossVolume.previous;
+        return overviewAnalytics.grossVolume.previous;
       case "net_volume":
-        return analytics.netVolume.previous;
+        return overviewAnalytics.netVolume.previous;
       case "new_customers":
-        return analytics.newCustomers.previous;
+        return overviewAnalytics.newCustomers.previous;
       case "successful_payments":
         // For successful payments, we'd need previous period payments data
         // For now, return 0 or calculate from failed payments if available
@@ -123,18 +173,18 @@ const Homepage = () => {
   };
 
   const getMetricTimeSeries = () => {
-    if (!analytics) return { current: [], previous: [] };
+    if (!overviewAnalytics) return { current: [], previous: [] };
     switch (selectedMetric) {
       case "gross_volume":
-        return analytics.grossVolume.timeSeries;
+        return overviewAnalytics.grossVolume.timeSeries;
       case "net_volume":
-        return analytics.netVolume.timeSeries;
+        return overviewAnalytics.netVolume.timeSeries;
       case "new_customers":
-        return analytics.newCustomers.timeSeries;
+        return overviewAnalytics.newCustomers.timeSeries;
       case "successful_payments":
         // For successful payments, we'd need to generate time series from payments
         // For now, return empty or use gross volume as placeholder
-        return analytics.grossVolume.timeSeries;
+        return overviewAnalytics.grossVolume.timeSeries;
       default:
         return { current: [], previous: [] };
     }
@@ -147,7 +197,7 @@ const Homepage = () => {
     return `US$${value.toFixed(2)}`;
   };
 
-  const formatCompareDate = (date: Date): string => {
+  const formatSelectedDate = (date: Date): string => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -314,7 +364,7 @@ const Homepage = () => {
   };
 
   const renderSection = (sectionId: SectionType, index: number) => {
-    if (!analytics) return null;
+    if (!overviewAnalytics) return null;
 
     const sectionProps = {
       draggable: isEditMode,
@@ -354,7 +404,7 @@ const Homepage = () => {
                 </button>
               </div>
             )}
-            <PaymentsCard payments={analytics.payments} />
+            <PaymentsCard payments={overviewAnalytics.payments} />
           </div>
         );
       case "grossVolume":
@@ -374,8 +424,8 @@ const Homepage = () => {
               </div>
             )}
             <GrossVolumeCard
-              data={analytics.grossVolume}
-              updatedAt={analytics.updatedAt}
+              data={overviewAnalytics.grossVolume}
+              updatedAt={overviewAnalytics.updatedAt}
             />
           </div>
         );
@@ -396,8 +446,8 @@ const Homepage = () => {
               </div>
             )}
             <NetVolumeCard
-              data={analytics.netVolume}
-              updatedAt={analytics.updatedAt}
+              data={overviewAnalytics.netVolume}
+              updatedAt={overviewAnalytics.updatedAt}
             />
           </div>
         );
@@ -417,7 +467,7 @@ const Homepage = () => {
                 </button>
               </div>
             )}
-            <FailedPaymentsCard failedPayments={analytics.failedPayments} />
+            <FailedPaymentsCard failedPayments={overviewAnalytics.failedPayments} />
           </div>
         );
       case "newCustomers":
@@ -437,8 +487,8 @@ const Homepage = () => {
               </div>
             )}
             <NewCustomersCard
-              data={analytics.newCustomers}
-              updatedAt={analytics.updatedAt}
+              data={overviewAnalytics.newCustomers}
+              updatedAt={overviewAnalytics.updatedAt}
             />
           </div>
         );
@@ -458,7 +508,7 @@ const Homepage = () => {
                 </button>
               </div>
             )}
-            <TopCustomersCard topCustomers={analytics.topCustomersBySpend} />
+            <TopCustomersCard topCustomers={overviewAnalytics.topCustomersBySpend} />
           </div>
         );
       default:
@@ -583,7 +633,7 @@ const Homepage = () => {
                   }}
               >
                 <span className="text-sm font-normal">
-                    {formatCompareDate(selectedCompareDate)}
+                    {formatSelectedDate(topSelectedDate)}
                 </span>
                 <ChevronDownIcon
                   className={cn(
@@ -612,11 +662,10 @@ const Homepage = () => {
                         isOpen={compareDatePickerOpen}
                         onClose={() => setCompareDatePickerOpen(false)}
                         onApply={(date) => {
-                          setSelectedCompareDate(date);
+                          setTopSelectedDate(date);
                           setCompareDatePickerOpen(false);
-                          // TODO: Fetch analytics for the selected compare date
                         }}
-                        currentDate={selectedCompareDate}
+                        currentDate={topSelectedDate}
                       />
                     </div>,
                     document.body
@@ -627,26 +676,34 @@ const Homepage = () => {
               currentData={getMetricTimeSeries().current}
               previousData={getMetricTimeSeries().previous}
               currency={selectedMetric === "new_customers" || selectedMetric === "successful_payments" ? "" : "US$"}
+              showPrevious={false}
+              startDate={topSelectedDate}
+              endDate={topSelectedDate}
             />
         </div>
         <HeroSection />
       </div>
       </div>
       <SecondSectionHeader
-        dateRange={dateRange}
-        frequency={frequency}
-        compareOption={compareOption}
-        customDateRange={customDateRange}
+        dateRange="" // not used in simplified version
+        frequency={overviewFrequency}
+        compareOption={overviewCompareOption}
+        dateRangeObj={overviewDateRange}
         onDateRangeChange={(range) => {
-          setDateRange(range);
-          setCustomDateRange(undefined); // Clear custom range when predefined is selected
+          setOverviewDateRange(range);
+          // Auto-switch to hourly for single day
+          if (
+            range.start.getFullYear() === range.end.getFullYear() &&
+            range.start.getMonth() === range.end.getMonth() &&
+            range.start.getDate() === range.end.getDate()
+          ) {
+            setOverviewFrequency("hourly");
+          } else if (overviewFrequency === "hourly") {
+            setOverviewFrequency("daily");
+          }
         }}
-        onCustomDateRangeChange={(range) => {
-          setCustomDateRange(range);
-          setDateRange("custom"); // Set to custom to indicate custom range
-        }}
-        onFrequencyChange={setFrequency}
-        onCompareChange={setCompareOption}
+        onFrequencyChange={setOverviewFrequency}
+        onCompareChange={setOverviewCompareOption}
         onAddClick={() => setIsAddModalOpen(true)}
         onEditClick={() => setIsEditMode(!isEditMode)}
         isEditMode={isEditMode}
@@ -657,15 +714,15 @@ const Homepage = () => {
         onAdd={handleAddSection}
         existingSections={sections}
       />
-      {loading ? (
+      {overviewLoading ? (
         <div className="w-full flex items-center justify-center py-12">
           <div className="text-gray-500">Loading analytics...</div>
               </div>
-      ) : error ? (
+      ) : overviewError ? (
         <div className="w-full flex items-center justify-center py-12">
-          <div className="text-red-500">Error: {error}</div>
+          <div className="text-red-500">Error: {overviewError}</div>
           </div>
-      ) : analytics ? (
+      ) : overviewAnalytics ? (
         <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-2 bg-[#f5f6f8] rounded-md p-2 mt-2 mb-16 relative z-0" style={{ gridAutoRows: "380px", alignContent: "start" }}>
           {sections.map((sectionId, index) => renderSection(sectionId, index))}
       </div>

@@ -30,6 +30,9 @@ interface LineChartProps {
   currentData: TimeSeriesPoint[];
   previousData: TimeSeriesPoint[];
   currency?: string;
+  showPrevious?: boolean; // if false, hide dotted previous series
+  startDate?: Date;
+  endDate?: Date;
 }
 
 const generateLabels = (data: TimeSeriesPoint[]) => {
@@ -101,8 +104,16 @@ const baseOptions: ChartOptions<"line"> = {
   },
 };
 
-const LineChart = ({ currentData, previousData, currency = "US$" }: LineChartProps) => {
+const LineChart = ({ currentData, previousData, currency = "US$", showPrevious = true, startDate, endDate }: LineChartProps) => {
   const labels = generateLabels(currentData.length > 0 ? currentData : previousData);
+  
+  // Format date range for display
+  const formatDateLabel = (date: Date): string => {
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const startDateLabel = startDate ? formatDateLabel(startDate) : "";
+  const endDateLabel = endDate ? formatDateLabel(endDate) : "";
   
   // Extract values from time series data
   const currentValues = currentData.map(point => point.value || 0);
@@ -129,16 +140,20 @@ const LineChart = ({ currentData, previousData, currency = "US$" }: LineChartPro
         pointRadius: 0,
         tension: 0.1,
       },
-      {
-        label: "Previous",
-        data: paddedPrevious,
-        borderColor: "rgb(156, 163, 175)",
-        backgroundColor: "rgba(107, 114, 128, 0.5)",
-        borderWidth: 1,
-        pointRadius: 0,
-        borderDash: [5, 5],
-        tension: 0.1,
-      },
+      ...(showPrevious
+        ? [
+            {
+              label: "Previous",
+              data: paddedPrevious,
+              borderColor: "rgb(156, 163, 175)",
+              backgroundColor: "rgba(107, 114, 128, 0.5)",
+              borderWidth: 1,
+              pointRadius: 0,
+              borderDash: [5, 5],
+              tension: 0.1,
+            },
+          ]
+        : []),
     ],
   };
 
@@ -172,9 +187,12 @@ const LineChart = ({ currentData, previousData, currency = "US$" }: LineChartPro
           callback: function (value: string | number) {
             const labelIndex =
               typeof value === "number" ? value : parseInt(value as string);
-            // Show only first and last labels, but grid lines will show for all
-            if (labelIndex === 0 || labelIndex === labels.length - 1) {
-              return labels[labelIndex];
+            // Show start date on left, end date on right
+            if (labelIndex === 0) {
+              return startDateLabel || labels[labelIndex];
+            }
+            if (labelIndex === labels.length - 1) {
+              return endDateLabel || labels[labelIndex];
             }
             return "";
           },

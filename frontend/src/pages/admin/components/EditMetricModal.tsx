@@ -58,6 +58,8 @@ const EditMetricModal = ({
   const [newEntryHour, setNewEntryHour] = useState<number | null>(null);
   const [newEntryValue, setNewEntryValue] = useState<string>("");
   const [creatingNewEntry, setCreatingNewEntry] = useState(false);
+  const [newEntryMode, setNewEntryMode] = useState<"daily" | "hourly">("daily");
+  const [editMode, setEditMode] = useState<"daily" | "hourly">("daily");
   
   // For new_customers, successful_payments, failed_payments: transaction creation fields
   const [newCustomerEmail, setNewCustomerEmail] = useState<string>("");
@@ -88,14 +90,17 @@ const EditMetricModal = ({
       setHourlyBreakdown(metric.snapshot?.hourlyBreakdown || {});
       setError(null);
       setShowNewEntry(false);
-      // Set default new entry date to the start of the date range or current date
-      if (dateRange) {
+      // Set default new entry date: for hourly edits use specific date, for daily use range start
+      if (entryMethod === "hourly") {
+        setNewEntryDate(new Date(date));
+      } else if (dateRange) {
         setNewEntryDate(new Date(dateRange.start));
       } else {
         setNewEntryDate(new Date(date));
       }
       setNewEntryHour(null);
       setNewEntryValue("");
+      setNewEntryMode("daily");
       setNewCustomerEmail("");
       setNewCustomerName("");
       setNewCustomerAmount("");
@@ -232,21 +237,16 @@ const EditMetricModal = ({
       const dateStr = date.toISOString().split("T")[0];
       const normalizedDate = new Date(dateStr);
 
-      // If hourly breakdown, use manual source and update specific hour
-      const finalSource = entryMethod === "hourly" ? "manual" : source;
+      // If hourly breakdown, use manual source
+      const finalSource = editMode === "hourly" ? "manual" : source;
       
-      let finalHourlyBreakdown = entryMethod === "hourly" ? { ...hourlyBreakdown } : undefined;
-      
-      // If editing a specific hour, update that hour in the breakdown
-      if (entryMethod === "hourly" && selectedHour !== null && finalHourlyBreakdown) {
-        finalHourlyBreakdown[selectedHour as number] = numValue;
-      }
+      let finalHourlyBreakdown = editMode === "hourly" ? { ...hourlyBreakdown } : undefined;
 
       await analyticsSnapshotService.createOrUpdate(
         normalizedDate,
         metric.metric,
         // For hourly, use the total of all hours; for daily, use the value directly
-        entryMethod === "hourly" && finalHourlyBreakdown
+        editMode === "hourly" && finalHourlyBreakdown
           ? Object.values(finalHourlyBreakdown).reduce((sum, v) => sum + v, 0)
           : numValue,
         finalSource,
@@ -464,10 +464,16 @@ const EditMetricModal = ({
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <label className="text-xs font-semibold text-gray-500 block mb-2">
-                  {dateRange ? "Date Range" : "Date"}
+                  {editMode === "hourly" ? "Date" : dateRange ? "Date Range" : "Date"}
                 </label>
                 <div className="text-sm font-medium text-gray-900">
-                  {dateRange
+                  {editMode === "hourly"
+                    ? date.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : dateRange
                     ? `${dateRange.start.toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
@@ -500,14 +506,7 @@ const EditMetricModal = ({
                 </button>
               )}
             </div>
-            {entryMethod === "hourly" && selectedHour !== null && (
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <span className="text-xs text-gray-600">
-                  Editing hourly data for <span className="font-semibold text-gray-900">{(selectedHour as number).toString().padStart(2, "0")}:00</span>
-                </span>
-              </div>
-            )}
-            {entryMethod === "daily" && dateRange && (
+            {editMode === "daily" && dateRange && (
               <p className="text-xs text-gray-500 mt-2">
                 Values will be aggregated across the entire date range.
               </p>
@@ -590,10 +589,38 @@ const EditMetricModal = ({
             </div>
           )}
 
-          {/* Value */}
+          {/* Edit Mode Toggle */}
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Edit Mode</label>
+            <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setEditMode("daily")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium",
+                  editMode === "daily" ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600"
+                )}
+              >
+                Daily
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode("hourly")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium border-l border-gray-300",
+                  editMode === "hourly" ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600"
+                )}
+              >
+                Hourly
+              </button>
+            </div>
+          </div>
+
+          {/* Value (Daily edit mode) */}
+          {editMode === "daily" && (
           <div className="mb-4">
             <label className="text-sm font-semibold text-gray-700 block mb-2">
-              Value {entryMethod === "hourly" && selectedHour !== null && `(for ${(selectedHour as number).toString().padStart(2, "0")}:00)`}
+              Value
             </label>
             <div className="relative">
               {metric.format === "currency" && (
@@ -620,12 +647,8 @@ const EditMetricModal = ({
                 required
               />
             </div>
-            {entryMethod === "hourly" && selectedHour !== null && (
-              <p className="text-xs text-gray-500 mt-1">
-                This value will be set for the {(selectedHour as number).toString().padStart(2, "0")}:00 hour slot
-              </p>
-            )}
           </div>
+          )}
 
           {/* Source */}
           <div className="mb-4">
@@ -635,7 +658,7 @@ const EditMetricModal = ({
             <div className="flex gap-4">
               <label className={cn(
                 "flex items-center gap-2 cursor-pointer px-3 py-2 rounded-md border transition-colors",
-                entryMethod === "hourly" 
+                editMode === "hourly" 
                   ? "opacity-50 cursor-not-allowed border-gray-200 bg-gray-50"
                   : source === "calculated"
                   ? "border-[#533afd] bg-blue-50"
@@ -649,11 +672,11 @@ const EditMetricModal = ({
                     setSource(e.target.value as "calculated" | "manual")
                   }
                   className="size-4 text-[#533afd] focus:ring-[#533afd]"
-                  disabled={entryMethod === "hourly"}
+                  disabled={editMode === "hourly"}
                 />
                 <span className={cn(
                   "text-sm font-medium",
-                  entryMethod === "hourly" ? "text-gray-400" : "text-gray-700"
+                  editMode === "hourly" ? "text-gray-400" : "text-gray-700"
                 )}>
                   Calculated
                 </span>
@@ -676,7 +699,7 @@ const EditMetricModal = ({
                 <span className="text-sm font-medium text-gray-700">Manual Override</span>
               </label>
             </div>
-            {entryMethod === "hourly" && (
+            {editMode === "hourly" && (
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
                 <p className="text-xs text-blue-700">
                   ⓘ Hourly breakdown automatically creates a manual override
@@ -685,8 +708,8 @@ const EditMetricModal = ({
             )}
           </div>
 
-          {/* Hourly Breakdown (if entry method is hourly) */}
-          {entryMethod === "hourly" && (
+          {/* Hourly Breakdown (if hourly edit mode) */}
+          {editMode === "hourly" && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-semibold text-gray-700">
@@ -718,19 +741,14 @@ const EditMetricModal = ({
                       value={hourlyBreakdown[i] || ""}
                       onChange={(e) => updateHourlyValue(i, e.target.value)}
                       className={cn(
-                        "w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#533afd] focus:border-[#533afd] bg-white",
-                        selectedHour === i && "ring-2 ring-[#533afd] border-[#533afd]"
+                        "w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-[#533afd] focus:border-[#533afd] bg-white"
                       )}
                       placeholder="0"
                     />
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                {selectedHour !== null 
-                  ? `Editing hour ${(selectedHour as number).toString().padStart(2, "0")}:00. Use the hourly breakdown grid above to edit all 24 hours.`
-                  : "Enter values for each hour. The total will be calculated automatically."}
-              </p>
+              <p className="text-xs text-gray-500 mt-2">Enter values for each hour. The total will be calculated automatically.</p>
             </div>
           )}
 
@@ -825,8 +843,8 @@ const EditMetricModal = ({
                     )}
                 </div>
 
-                {/* Hour Selector (if hourly mode and not transaction-based metrics) */}
-                {entryMethod === "hourly" && 
+                {/* Hour Selector for Create New Entry when Hourly mode is chosen */}
+                {newEntryMode === "hourly" && 
                  metric.metric !== "new_customers" && 
                  metric.metric !== "successful_payments" && 
                  metric.metric !== "failed_payments" && (
@@ -857,7 +875,34 @@ const EditMetricModal = ({
                   </div>
                 )}
 
-                {/* New Customer Form (only for new_customers metric) */}
+          {/* New Entry Mode Toggle (Daily / Hourly) */}
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-gray-600 block mb-1">Entry Mode</label>
+            <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setNewEntryMode("daily")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium",
+                  newEntryMode === "daily" ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600"
+                )}
+              >
+                Daily
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewEntryMode("hourly")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium border-l border-gray-300",
+                  newEntryMode === "hourly" ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600"
+                )}
+              >
+                Hourly
+              </button>
+            </div>
+          </div>
+
+          {/* New Customer Form (only for new_customers metric) */}
                 {metric.metric === "new_customers" ? (
                   <>
                     <div className="mb-3">
@@ -906,7 +951,7 @@ const EditMetricModal = ({
                       </div>
                     </div>
                   </>
-                ) : metric.metric === "successful_payments" || metric.metric === "failed_payments" ? (
+          ) : metric.metric === "successful_payments" || metric.metric === "failed_payments" ? (
                   <>
                     <div className="mb-3">
                       <label className="text-xs font-semibold text-gray-600 block mb-1">
@@ -967,7 +1012,7 @@ const EditMetricModal = ({
                     </div>
                   </>
                 ) : (
-                  /* Value Input for other metrics */
+            /* Value Input for other metrics */
                   <div className="mb-3">
                     <label className="text-xs font-semibold text-gray-600 block mb-1">
                       Value
@@ -1004,12 +1049,12 @@ const EditMetricModal = ({
                   type="button"
                   onClick={async () => {
                     // Validation
-                    if (metric.metric === "new_customers") {
+              if (metric.metric === "new_customers") {
                       if (!newCustomerEmail) {
                         setError("Please provide a customer email");
                         return;
                       }
-                    } else if (metric.metric === "successful_payments" || metric.metric === "failed_payments") {
+              } else if (metric.metric === "successful_payments" || metric.metric === "failed_payments") {
                       if (!newPaymentEmail || !newPaymentAmount) {
                         setError("Please provide customer email and payment amount");
                         return;
@@ -1019,7 +1064,7 @@ const EditMetricModal = ({
                         setError("Please enter a valid payment amount");
                         return;
                       }
-                    } else {
+              } else {
                       if (!newEntryDate || !newEntryValue) {
                         setError("Please provide a date and value for the new entry");
                         return;
@@ -1033,7 +1078,7 @@ const EditMetricModal = ({
                       const entryDate = new Date(newEntryDate);
                       entryDate.setHours(0, 0, 0, 0);
 
-                      if (metric.metric === "new_customers") {
+                if (metric.metric === "new_customers") {
                         // Create a transaction for the new customer
                         const transactionData: Partial<Transaction> = {
                           owner_email: newCustomerEmail,
@@ -1041,7 +1086,13 @@ const EditMetricModal = ({
                           amount: newCustomerAmount ? parseFloat(newCustomerAmount) * 100 : 10000, // Convert to cents, default $100
                           currency: "USD",
                           status: "succeeded",
-                          admin_date: entryDate,
+                    admin_date: (() => {
+                      const d = new Date(entryDate);
+                      if (newEntryMode === "hourly" && newEntryHour !== null) {
+                        d.setHours(newEntryHour, 0, 0, 0);
+                      }
+                      return d;
+                    })(),
                           payment_id: `pm_${Math.random().toString(36).substr(2, 9)}`,
                           fingerprint: `fp_${Math.random().toString(36).substr(2, 9)}`,
                           description: `New customer entry: ${newCustomerEmail}`,
@@ -1054,7 +1105,7 @@ const EditMetricModal = ({
                         setNewCustomerEmail("");
                         setNewCustomerName("");
                         setNewCustomerAmount("");
-                      } else if (metric.metric === "successful_payments" || metric.metric === "failed_payments") {
+                } else if (metric.metric === "successful_payments" || metric.metric === "failed_payments") {
                         // Create a transaction for successful or failed payment
                         const transactionData: Partial<Transaction> = {
                           owner_email: newPaymentEmail,
@@ -1062,7 +1113,13 @@ const EditMetricModal = ({
                           amount: parseFloat(newPaymentAmount) * 100, // Convert to cents
                           currency: "USD",
                           status: metric.metric === "successful_payments" ? "succeeded" : "failed",
-                          admin_date: entryDate,
+                    admin_date: (() => {
+                      const d = new Date(entryDate);
+                      if (newEntryMode === "hourly" && newEntryHour !== null) {
+                        d.setHours(newEntryHour, 0, 0, 0);
+                      }
+                      return d;
+                    })(),
                           payment_id: `pm_${Math.random().toString(36).substr(2, 9)}`,
                           fingerprint: `fp_${Math.random().toString(36).substr(2, 9)}`,
                           description: newPaymentDescription || `${metric.metric === "successful_payments" ? "Successful" : "Failed"} payment entry: ${newPaymentEmail}`,
@@ -1076,7 +1133,7 @@ const EditMetricModal = ({
                         setNewPaymentName("");
                         setNewPaymentAmount("");
                         setNewPaymentDescription("");
-                      } else {
+                } else {
                         // Create analytics snapshot for other metrics
                         const entryValue = parseFloat(newEntryValue);
                         if (isNaN(entryValue)) {
@@ -1085,27 +1142,28 @@ const EditMetricModal = ({
                           return;
                         }
 
-                        let entryHourlyBreakdown: { [hour: number]: number } | undefined;
-
-                        if (entryMethod === "hourly" && newEntryHour !== null) {
-                          entryHourlyBreakdown = { [newEntryHour]: entryValue };
-                        } else if (entryMethod === "hourly") {
-                          entryHourlyBreakdown = {};
-                          for (let i = 0; i < 24; i++) {
-                            entryHourlyBreakdown[i] = entryValue / 24;
-                          }
-                        }
+                  let entryHourlyBreakdown: { [hour: number]: number } | undefined;
+                  if (newEntryMode === "hourly") {
+                    if (newEntryHour !== null) {
+                      entryHourlyBreakdown = { [newEntryHour]: entryValue };
+                    } else {
+                      entryHourlyBreakdown = {};
+                      for (let i = 0; i < 24; i++) {
+                        entryHourlyBreakdown[i] = entryValue / 24;
+                      }
+                    }
+                  }
 
                         await analyticsSnapshotService.createOrUpdate(
                           entryDate,
                           metric.metric,
-                          entryMethod === "hourly" && entryHourlyBreakdown
+                    newEntryMode === "hourly" && entryHourlyBreakdown
                             ? Object.values(entryHourlyBreakdown).reduce(
                                 (sum, v) => sum + v,
                                 0
                               )
                             : entryValue,
-                          "manual",
+                    "manual",
                           entryHourlyBreakdown,
                           undefined
                         );

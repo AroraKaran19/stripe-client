@@ -83,12 +83,13 @@ const calculateDateRange = (
         break;
       case "last_7_days":
         currentStart = new Date(now);
-        currentStart.setDate(currentStart.getDate() - 7);
+        // Include today => start 6 days ago
+        currentStart.setDate(currentStart.getDate() - 6);
         currentStart.setHours(0, 0, 0, 0);
         break;
       case "last_4_weeks":
         currentStart = new Date(now);
-        currentStart.setDate(currentStart.getDate() - 28);
+        currentStart.setDate(currentStart.getDate() - 27);
         currentStart.setHours(0, 0, 0, 0);
         break;
       case "last_30_days":
@@ -132,6 +133,11 @@ const calculateDateRange = (
   const duration = currentEnd.getTime() - currentStart.getTime();
 
   switch (compareOption) {
+    case "none":
+      // No comparison - set previous period to same as current (will result in identical data)
+      previousStart = new Date(currentStart);
+      previousEnd = new Date(currentEnd);
+      break;
     case "previous_week":
       // Previous week (7 days before current period)
       previousEnd = new Date(currentStart.getTime() - 1);
@@ -167,12 +173,12 @@ const calculateDateRange = (
       break;
     case "custom":
       // Custom - for now, same as previous_period (would need separate UI for custom dates)
+      previousStart = new Date(currentStart.getTime() - duration);
       previousEnd = new Date(currentStart.getTime() - 1);
-      previousStart = new Date(previousEnd.getTime() - duration);
       break;
     case "previous_period":
     default:
-      // Previous period (same duration, before current period)
+      // Overlay previous period: go back duration from current start
       previousEnd = new Date(currentStart.getTime() - 1);
       previousStart = new Date(previousEnd.getTime() - duration);
       break;
@@ -182,6 +188,19 @@ const calculateDateRange = (
     current: { start: currentStart, end: currentEnd },
     previous: { start: previousStart, end: previousEnd },
   };
+};
+
+const formatLocalDate = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const da = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${da}`;
+};
+
+const formatLocalHourKey = (d: Date): string => {
+  const base = formatLocalDate(d);
+  const h = String(d.getHours()).padStart(2, "0");
+  return `${base}T${h}:00:00`;
 };
 
 const generateTimeSeries = (
@@ -207,7 +226,7 @@ const generateTimeSeries = (
         const date = new Date(tx.admin_date);
         // Only include transactions from the selected day
         if (date >= singleDayStart && date <= singleDayEnd) {
-          const hourKey = `${date.toISOString().split("T")[0]}T${String(date.getHours()).padStart(2, "0")}:00:00`;
+          const hourKey = formatLocalHourKey(date);
           hourlyMap.set(
             hourKey,
             (hourlyMap.get(hourKey) || 0) + (tx.amount || 0)
@@ -219,7 +238,7 @@ const generateTimeSeries = (
     // Generate all 24 hours for the selected day
     const currentDate = new Date(singleDayStart);
     while (currentDate <= singleDayEnd) {
-      const hourKey = `${currentDate.toISOString().split("T")[0]}T${String(currentDate.getHours()).padStart(2, "0")}:00:00`;
+      const hourKey = formatLocalHourKey(currentDate);
       points.push({
         date: hourKey,
         value: hourlyMap.get(hourKey) || 0,
@@ -232,7 +251,7 @@ const generateTimeSeries = (
     transactions.forEach((tx) => {
       if (tx.admin_date) {
         const date = new Date(tx.admin_date);
-        const dateKey = date.toISOString().split("T")[0];
+        const dateKey = formatLocalDate(date);
         dailyMap.set(
           dateKey,
           (dailyMap.get(dateKey) || 0) + (tx.amount || 0)
@@ -242,7 +261,7 @@ const generateTimeSeries = (
 
     const currentDate = new Date(start);
     while (currentDate <= end) {
-      const dateKey = currentDate.toISOString().split("T")[0];
+      const dateKey = formatLocalDate(currentDate);
       points.push({
         date: dateKey,
         value: dailyMap.get(dateKey) || 0,
@@ -333,7 +352,7 @@ const generateCustomerTimeSeries = (
         const date = new Date(tx.admin_date);
         // Only include transactions from the selected day
         if (date >= singleDayStart && date <= singleDayEnd) {
-          const hourKey = `${date.toISOString().split("T")[0]}T${String(date.getHours()).padStart(2, "0")}:00:00`;
+          const hourKey = formatLocalHourKey(date);
           const customerKey = tx.customer_id || tx.owner_email || "";
           if (!hourlyMap.has(hourKey)) {
             hourlyMap.set(hourKey, new Set());
@@ -346,7 +365,7 @@ const generateCustomerTimeSeries = (
     // Generate all 24 hours for the selected day
     const currentDate = new Date(singleDayStart);
     while (currentDate <= singleDayEnd) {
-      const hourKey = `${currentDate.toISOString().split("T")[0]}T${String(currentDate.getHours()).padStart(2, "0")}:00:00`;
+      const hourKey = formatLocalHourKey(currentDate);
       points.push({
         date: hourKey,
         value: hourlyMap.get(hourKey)?.size || 0,
@@ -358,7 +377,7 @@ const generateCustomerTimeSeries = (
     transactions.forEach((tx) => {
       if (tx.admin_date && (tx.customer_id || tx.owner_email)) {
         const date = new Date(tx.admin_date);
-        const dateKey = date.toISOString().split("T")[0];
+        const dateKey = formatLocalDate(date);
         const customerKey = tx.customer_id || tx.owner_email || "";
         if (!dailyMap.has(dateKey)) {
           dailyMap.set(dateKey, new Set());
@@ -369,7 +388,7 @@ const generateCustomerTimeSeries = (
 
     const currentDate = new Date(start);
     while (currentDate <= end) {
-      const dateKey = currentDate.toISOString().split("T")[0];
+      const dateKey = formatLocalDate(currentDate);
       points.push({
         date: dateKey,
         value: dailyMap.get(dateKey)?.size || 0,

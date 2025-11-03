@@ -13,25 +13,15 @@ interface DateRange {
 interface SecondSectionHeaderProps {
   dateRange: string;
   frequency: string;
-  compareOption?: string;
-  customDateRange?: DateRange;
-  onDateRangeChange: (range: string) => void;
-  onCustomDateRangeChange: (range: DateRange | undefined) => void;
+  compareOption?: string | null;
+  dateRangeObj?: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
   onFrequencyChange: (freq: string) => void;
-  onCompareChange?: (option: string) => void;
+  onCompareChange?: (option: string | null) => void;
   onAddClick?: () => void;
   onEditClick?: () => void;
   isEditMode?: boolean;
 }
-
-const dateRangeOptions = [
-  { value: "today", label: "Today" },
-  { value: "last_7_days", label: "Last 7 days" },
-  { value: "last_4_weeks", label: "Last 4 weeks" },
-  { value: "month_to_date", label: "Month to date" },
-  { value: "quarter_to_date", label: "Quarter to date" },
-  { value: "all_time", label: "All time" },
-];
 
 const frequencyOptions = [
   { value: "daily", label: "Daily" },
@@ -47,12 +37,11 @@ const compareOptions = [
 ];
 
 const SecondSectionHeader = ({
-  dateRange,
+  dateRange: _dateRange,
   frequency,
-  compareOption = "previous_period",
-  customDateRange,
+  compareOption = null,
+  dateRangeObj,
   onDateRangeChange,
-  onCustomDateRangeChange,
   onFrequencyChange,
   onCompareChange,
   onAddClick,
@@ -171,15 +160,13 @@ const SecondSectionHeader = ({
     }
   };
 
-  const currentDateRangeLabel = customDateRange
-    ? customDateRange.label
-    : dateRangeOptions.find((opt) => opt.value === dateRange)?.label ||
-      "Last 7 days";
+  const currentDateRangeLabel = dateRangeObj?.label || "Last 7 days";
   const currentFrequencyLabel =
     frequencyOptions.find((opt) => opt.value === frequency)?.label || "Daily";
   const currentCompareLabel =
-    compareOptions.find((opt) => opt.value === compareOption)?.label ||
-    "Previous period";
+    compareOption && compareOptions.find((opt) => opt.value === compareOption)?.label
+      ? compareOptions.find((opt) => opt.value === compareOption)?.label
+      : "Compare";
 
   return (
     <>
@@ -229,21 +216,10 @@ const SecondSectionHeader = ({
                   isOpen={dateRangePickerOpen}
                   onClose={() => setDateRangePickerOpen(false)}
                   onApply={(range) => {
-                    // Check if it's a predefined range by comparing with options
-                    const predefinedMatch = dateRangeOptions.find(
-                      (opt) => opt.label === range.label
-                    );
-                    if (predefinedMatch) {
-                      // Use predefined range
-                      onDateRangeChange(predefinedMatch.value);
-                      onCustomDateRangeChange(undefined);
-                    } else {
-                      // Custom range
-                      onCustomDateRangeChange(range);
-                    }
+                    onDateRangeChange(range);
                     setDateRangePickerOpen(false);
                   }}
-                  currentRange={customDateRange}
+                  currentRange={dateRangeObj}
                 />
               </div>,
               document.body
@@ -341,6 +317,26 @@ const SecondSectionHeader = ({
                   left: `${comparePosition.left}px`,
                 }}
               >
+                <button
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[#f5f6f8] transition-colors flex items-center justify-between",
+                    {
+                      "text-[#533afd] bg-[#f5f6f8]": !compareOption,
+                      "text-[#353a44]": compareOption,
+                    }
+                  )}
+                  onClick={() => {
+                    if (onCompareChange) {
+                      onCompareChange(null);
+                    }
+                    setCompareOpen(false);
+                  }}
+                >
+                  <span>None</span>
+                  {!compareOption && (
+                    <span className="text-[#533afd]">✓</span>
+                  )}
+                </button>
                 {compareOptions.map((option) => (
                   <button
                     key={option.value}
