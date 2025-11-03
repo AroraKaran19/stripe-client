@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import { useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon, RefreshCw, Edit2, Clock } from "lucide-react";
+import { ChevronDownIcon, RefreshCw, Edit2 } from "lucide-react";
 import { cn } from "../../utils";
 import { analyticsSnapshotService, type AnalyticsSnapshot } from "../../services/analytics-snapshot.service";
 import { analyticsService } from "../../services/analytics.service";
@@ -26,7 +25,6 @@ interface MetricCard {
 }
 
 const AdminHomePage = () => {
-  const location = useLocation();
   const [dateRange, setDateRange] = useState<DateRange>(() => {
     const end = new Date();
     const start = new Date();
@@ -346,8 +344,7 @@ const AdminHomePage = () => {
     }
 
       // Count days with and without manual entries
-      const daysWithManual = daysInRange.filter((day) => manualEntryMap.has(day));
-      const daysWithoutManual = daysInRange.filter((day) => !manualEntryMap.has(day));
+        const daysWithoutManual = daysInRange.filter((day) => !manualEntryMap.has(day));
 
       // If all days have manual entries, just sum manual values
       if (daysWithoutManual.length === 0) {

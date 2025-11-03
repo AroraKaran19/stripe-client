@@ -4,8 +4,6 @@ import { Helmet } from "react-helmet-async";
 import {
   Eye,
   Search,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   Trash2,
   Plus,
@@ -79,17 +77,6 @@ const AdminTransactionManagementPage = () => {
     fetchTransactions();
   }, [page, limit, selectedStatus, searchQuery]);
 
-  const formatDate = (date: Date | string | undefined) => {
-    if (!date) return "-";
-    const d = new Date(date);
-    return d.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const formatCurrency = (
     amount: number | undefined,

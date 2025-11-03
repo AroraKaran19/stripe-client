@@ -79,7 +79,7 @@ const EditMetricModal = ({
     if (isOpen) {
       // If hourly mode and hour is selected, show value for that specific hour
       if (entryMethod === "hourly" && selectedHour !== null && metric.snapshot?.hourlyBreakdown) {
-        const hourValue = metric.snapshot.hourlyBreakdown[selectedHour];
+        const hourValue = metric.snapshot.hourlyBreakdown[selectedHour as number];
         setValue(hourValue !== undefined && hourValue !== null ? hourValue.toString() : "0");
       } else {
         setValue(metric.value.toString());
@@ -239,7 +239,7 @@ const EditMetricModal = ({
       
       // If editing a specific hour, update that hour in the breakdown
       if (entryMethod === "hourly" && selectedHour !== null && finalHourlyBreakdown) {
-        finalHourlyBreakdown[selectedHour] = numValue;
+        finalHourlyBreakdown[selectedHour as number] = numValue;
       }
 
       await analyticsSnapshotService.createOrUpdate(
@@ -503,7 +503,7 @@ const EditMetricModal = ({
             {entryMethod === "hourly" && selectedHour !== null && (
               <div className="mt-2 pt-2 border-t border-gray-200">
                 <span className="text-xs text-gray-600">
-                  Editing hourly data for <span className="font-semibold text-gray-900">{selectedHour.toString().padStart(2, "0")}:00</span>
+                  Editing hourly data for <span className="font-semibold text-gray-900">{(selectedHour as number).toString().padStart(2, "0")}:00</span>
                 </span>
               </div>
             )}
@@ -593,7 +593,7 @@ const EditMetricModal = ({
           {/* Value */}
           <div className="mb-4">
             <label className="text-sm font-semibold text-gray-700 block mb-2">
-              Value {entryMethod === "hourly" && selectedHour !== null && `(for ${selectedHour.toString().padStart(2, "0")}:00)`}
+              Value {entryMethod === "hourly" && selectedHour !== null && `(for ${(selectedHour as number).toString().padStart(2, "0")}:00)`}
             </label>
             <div className="relative">
               {metric.format === "currency" && (
@@ -622,7 +622,7 @@ const EditMetricModal = ({
             </div>
             {entryMethod === "hourly" && selectedHour !== null && (
               <p className="text-xs text-gray-500 mt-1">
-                This value will be set for the {selectedHour.toString().padStart(2, "0")}:00 hour slot
+                This value will be set for the {(selectedHour as number).toString().padStart(2, "0")}:00 hour slot
               </p>
             )}
           </div>
@@ -728,7 +728,7 @@ const EditMetricModal = ({
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 {selectedHour !== null 
-                  ? `Editing hour ${selectedHour.toString().padStart(2, "0")}:00. Use the hourly breakdown grid above to edit all 24 hours.`
+                  ? `Editing hour ${(selectedHour as number).toString().padStart(2, "0")}:00. Use the hourly breakdown grid above to edit all 24 hours.`
                   : "Enter values for each hour. The total will be calculated automatically."}
               </p>
             </div>

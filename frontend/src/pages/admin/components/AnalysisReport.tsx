@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { FileText, Download, Calendar, TrendingUp, Users, DollarSign, CreditCard, XCircle, Percent, BarChart } from "lucide-react";
 import { jsPDF } from "jspdf";
 
