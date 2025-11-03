@@ -6,8 +6,8 @@ import { cn } from "../../utils";
 import { analyticsSnapshotService, type AnalyticsSnapshot } from "../../services/analytics-snapshot.service";
 import { analyticsService } from "../../services/analytics.service";
 import { transactionService } from "../../services/transaction.service";
+import { normalizeToUTC } from "../../utils/dateUtils";
 import EditMetricModal from "./components/EditMetricModal";
-import AnalysisReport from "./components/AnalysisReport";
 import DateRangePicker from "../../components/ui/DateRangePicker";
 
 interface DateRange {
@@ -101,20 +101,12 @@ const AdminHomePage = () => {
       setLoading(true);
       setError(null);
 
-      // Normalize dates
-      const startDate = new Date(dateRange.start);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(dateRange.end);
-      endDate.setHours(23, 59, 59, 999);
+      // Normalize dates to UTC start/end of day for consistent handling
+      const startDate = normalizeToUTC(dateRange.start, false);
+      const endDate = normalizeToUTC(dateRange.end, true);
 
-      // Fetch snapshots for the date range - this will include ALL snapshots (manual entries) in the range
-      const snapshotResponse = await analyticsSnapshotService.getByDateRange(
-        startDate,
-        endDate
-      );
-      setSnapshots(snapshotResponse.data);
-
-      // Fetch calculated analytics for the date range
+      // Fetch ALL data directly from database - no local calculations
+      // 1. Fetch analytics from backend (includes manual snapshots if they exist)
       const analyticsResponse = await analyticsService.getAnalytics(
         "custom",
         "daily",
@@ -122,9 +114,18 @@ const AdminHomePage = () => {
         endDate,
         "previous_period"
       );
+      // Set analytics data from database
       setCalculatedAnalytics(analyticsResponse.data);
 
-      // Fetch actual transaction counts for accurate metrics
+      // 2. Fetch snapshots from database (for source indicator only)
+      const snapshotResponse = await analyticsSnapshotService.getByDateRange(
+        startDate,
+        endDate
+      );
+      // Set snapshots from database
+      setSnapshots(snapshotResponse.data);
+
+      // 3. Fetch transaction counts directly from database
       const [successfulRes, failedRes] = await Promise.all([
         transactionService.getAll(1, 1, {
           status: "succeeded",
@@ -138,6 +139,7 @@ const AdminHomePage = () => {
         }),
       ]);
 
+      // Set transaction counts from database
       setTransactionCounts({
         successful: successfulRes.data.total || 0,
         failed: failedRes.data.total || 0,
@@ -205,130 +207,37 @@ const AdminHomePage = () => {
   // Removed selected hour logic
 
   const getMetricValue = (metric: string): number => {
-    // Filter manual snapshots for this metric within the date range
-    const manualSnapshots = snapshots.filter(
-      (s) => s.metric === metric && s.source === "manual"
-    );
-
-    // Get date range boundaries
-    const startDate = new Date(dateRange.start);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
-
-    // Create a map of dates that have manual entries (key: date string, value: snapshot)
-    const manualEntryMap = new Map<string, typeof snapshots[0]>();
-    manualSnapshots.forEach((s) => {
-      const snapshotDate = new Date(s.date);
-      snapshotDate.setHours(0, 0, 0, 0);
-      const dateKey = snapshotDate.toISOString().split("T")[0];
-      manualEntryMap.set(dateKey, s);
-    });
-
-    {
-      // Calculate all days in the range
-      const daysInRange: string[] = [];
-      const currentDate = new Date(startDate);
-      while (currentDate <= endDate) {
-        daysInRange.push(currentDate.toISOString().split("T")[0]);
-        currentDate.setDate(currentDate.getDate() + 1);
-      }
-
-      // Get calculated total for the range (used for days without manual entries)
-    let calculatedTotal = 0;
-    if (calculatedAnalytics) {
-      switch (metric) {
-        case "gross_volume":
-          calculatedTotal = calculatedAnalytics.grossVolume?.current || 0;
-          break;
-        case "net_volume":
-          calculatedTotal = calculatedAnalytics.netVolume?.current || 0;
-          break;
-        case "new_customers":
-          calculatedTotal = calculatedAnalytics.newCustomers?.current || 0;
-          break;
-        case "successful_payments":
-          calculatedTotal = transactionCounts.successful;
-          break;
-        case "failed_payments":
-          calculatedTotal = transactionCounts.failed;
-          break;
-        case "conversion_rate":
-          const totalSuccessful = transactionCounts.successful;
-          const totalFailed = transactionCounts.failed;
-          const totalTransactions = totalSuccessful + totalFailed;
-          calculatedTotal = totalTransactions > 0 ? (totalSuccessful / totalTransactions) * 100 : 0;
-          break;
-        case "average_order_value":
-          const grossVolume = calculatedAnalytics.grossVolume?.current || 0;
-          const successfulCount = transactionCounts.successful;
-          calculatedTotal = successfulCount > 0 ? grossVolume / successfulCount : 0;
-          break;
-      }
+    // ALL values come directly from database via backend API
+    // No local calculations - backend handles manual snapshots vs calculated values
+    // This ensures consistency with the home page - both use the same backend logic
+    if (!calculatedAnalytics) {
+      return 0;
     }
-
-      // Count days with and without manual entries
-        const daysWithoutManual = daysInRange.filter((day) => !manualEntryMap.has(day));
-
-      // If all days have manual entries, just sum manual values
-      if (daysWithoutManual.length === 0) {
-        const total = manualSnapshots.reduce((sum, s) => sum + s.value, 0);
-        // For number format metrics (counts), round to nearest integer
-        if (metric === "successful_payments" || metric === "failed_payments" || metric === "new_customers") {
-          return Math.round(total);
-        }
-        return total;
-      }
-
-      // If some days have manual entries and some don't, we need to mix them
-      // Calculate average per day from calculated total
-      const daysCount = daysInRange.length;
-      const averagePerDay = daysCount > 0 ? calculatedTotal / daysCount : 0;
-
-      // Sum manual entries
-      const manualTotal = manualSnapshots.reduce((sum, s) => sum + s.value, 0);
-
-      // For days without manual entries, use the average per day
-      const calculatedPart = averagePerDay * daysWithoutManual.length;
-
-      // Total = manual entries + calculated values for remaining days
-      // Round to avoid floating point precision issues for number format metrics
-      const result = manualTotal + calculatedPart;
-      
-      // For number format metrics (counts), round to nearest integer
-      if (metric === "successful_payments" || metric === "failed_payments" || metric === "new_customers") {
-        return Math.round(result);
-      }
-      
-      return result;
-    }
-
-    // No manual entries - use calculated value from analytics
-    if (!calculatedAnalytics) return 0;
 
     switch (metric) {
       case "gross_volume":
+        // Value from database: manual snapshot if exists, otherwise calculated from transactions
         return calculatedAnalytics.grossVolume?.current || 0;
       case "net_volume":
+        // Value from database: manual snapshot if exists, otherwise calculated from transactions
         return calculatedAnalytics.netVolume?.current || 0;
       case "new_customers":
-        return calculatedAnalytics.newCustomers?.current || 0;
-        case "successful_payments":
-          // Use actual transaction count instead of limited payments array
-          // Return as integer to avoid floating point issues
-          return Math.round(transactionCounts.successful);
-        case "failed_payments":
-          // Use actual transaction count instead of limited failedPayments array
-          // Return as integer to avoid floating point issues
-          return Math.round(transactionCounts.failed);
+        // Value from database: manual snapshot if exists, otherwise calculated from transactions
+        return Math.round(calculatedAnalytics.newCustomers?.current || 0);
+      case "successful_payments":
+        // Value from database: transaction count query
+        return transactionCounts.successful;
+      case "failed_payments":
+        // Value from database: transaction count query
+        return transactionCounts.failed;
       case "conversion_rate":
-        // Calculate conversion rate for the range using actual counts
+        // Calculated from database transaction counts
         const totalSuccessful = transactionCounts.successful;
         const totalFailed = transactionCounts.failed;
         const totalTransactions = totalSuccessful + totalFailed;
         return totalTransactions > 0 ? (totalSuccessful / totalTransactions) * 100 : 0;
       case "average_order_value":
-        // Calculate from gross volume and successful payments count
+        // Calculated using gross volume from database (which includes manual snapshots if they exist)
         const grossVolume = calculatedAnalytics.grossVolume?.current || 0;
         const successfulCount = transactionCounts.successful;
         return successfulCount > 0 ? grossVolume / successfulCount : 0;
@@ -338,6 +247,12 @@ const AdminHomePage = () => {
   };
 
   const getMetricSource = (metric: string): "calculated" | "manual" => {
+    // Check if manual snapshots exist for this metric in the date range
+    // This is only for display purposes - the actual value comes from backend database
+    // Always check fresh snapshots from database (not cached)
+    if (!snapshots || snapshots.length === 0) {
+      return "calculated";
+    }
     const manualSnapshots = snapshots.filter(
       (s) => s.metric === metric && s.source === "manual"
     );
@@ -380,6 +295,12 @@ const AdminHomePage = () => {
   };
 
   const handleSave = async () => {
+    // Force refresh all data from database after save
+    // Clear local state first to ensure fresh data
+    setSnapshots([]);
+    setCalculatedAnalytics(null);
+    setTransactionCounts({ successful: 0, failed: 0, newCustomers: 0 });
+    // Fetch fresh data from database
     await fetchData();
   };
 
@@ -562,15 +483,7 @@ const AdminHomePage = () => {
           </div>
         )}
 
-        {/* Analysis Report Section */}
-        {!loading && !error && (
-          <AnalysisReport
-            metrics={metricsWithValues}
-            dateRange={dateRange}
-            entryMethod={"daily"}
-            selectedHour={null}
-          />
-        )}
+        {/* Analysis Report Section removed */}
 
         {/* Edit Metric Modal */}
         {editingMetric && (
@@ -585,6 +498,7 @@ const AdminHomePage = () => {
             entryMethod={"daily"}
             dateRange={dateRange}
             selectedHour={null}
+            snapshots={snapshots}
           />
         )}
       </div>

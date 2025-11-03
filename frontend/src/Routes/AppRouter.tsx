@@ -5,6 +5,7 @@ import TransactionPage from "../pages/transactions/TransactionPage";
 import IndividualTransactionsPage from "../pages/transactions/slug/IndividualTransactionsPage";
 import AdminTransactionManagementPage from "../pages/admin/TransactionPage";
 import AdminHomePage from "../pages/admin/HomePage";
+import AdminIndexPage from "../pages/admin/AdminIndexPage";
 import NotFoundPage from "../pages/404/NotFoundPage";
 
 const AppRouter = () => {
@@ -18,6 +19,7 @@ const AppRouter = () => {
             path="/transactions/:id"
             element={<IndividualTransactionsPage />}
           />
+          <Route path="/admin" element={<AdminIndexPage />} />
           <Route
             path="/admin/transactions"
             element={<AdminTransactionManagementPage />}

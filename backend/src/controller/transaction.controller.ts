@@ -26,17 +26,14 @@ export const getTransactions = asyncHandler(
         filters.admin_date.$gte = new Date(req.query.date_from as string);
       }
       if (req.query.date_to) {
-        // Set to end of day for inclusive range
+        // Set to end of day for inclusive range - use UTC methods
         const endDate = new Date(req.query.date_to as string);
-        endDate.setHours(23, 59, 59, 999);
+        endDate.setUTCHours(23, 59, 59, 999);
         filters.admin_date.$lte = endDate;
       }
     }
 
-    // Search query - searches across multiple fields
-    const searchQuery = req.query.search as string;
-    
-    const result = await getAllTransactions(page, limit, filters, searchQuery);
+    const result = await getAllTransactions(page, limit, filters);
 
     res.status(200).json({
       status: "success",

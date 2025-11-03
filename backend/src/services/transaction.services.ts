@@ -79,7 +79,7 @@ export const getAllTransactions = async (
     ]);
 
     return {
-      transactions: transactions as ITransaction[],
+      transactions: transactions as unknown as ITransaction[],
       total,
       page,
       limit,

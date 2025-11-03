@@ -29,7 +29,7 @@ export const getSnapshot = asyncHandler(
 
     const snapshots = await getAnalyticsSnapshot(dateObj, metric);
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       data: snapshots,
     });
@@ -66,7 +66,7 @@ export const createOrUpdateSnapshot = asyncHandler(
       updatedBy
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       data: snapshot,
     });
@@ -94,7 +94,7 @@ export const deleteSnapshot = asyncHandler(
 
     await deleteAnalyticsSnapshot(dateObj, metric as string);
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       message: "Analytics snapshot deleted successfully",
     });
@@ -128,7 +128,7 @@ export const getSnapshotsByRange = asyncHandler(
       metric as string | undefined
     );
 
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       data: snapshots,
     });

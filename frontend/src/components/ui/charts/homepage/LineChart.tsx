@@ -50,17 +50,20 @@ const generateLabels = (data: TimeSeriesPoint[]) => {
 
   if (isHourly) {
     // For hourly data, show hour labels
+    // Use UTC hours to match the data source (backend stores in UTC)
     return data.map((point) => {
       const date = new Date(point.date);
-      const hour = String(date.getHours()).padStart(2, "0");
+      const hour = String(date.getUTCHours()).padStart(2, "0");
       return `${hour}:00`;
     });
   } else {
     // For daily data, show date labels
+    // Use UTC date methods to avoid timezone conversion issues
     return data.map((point) => {
       const date = new Date(point.date);
-      const day = date.getDate();
-      const month = date.toLocaleString("en-US", { month: "short" });
+      // Extract UTC date parts to avoid timezone conversion
+      const day = date.getUTCDate();
+      const month = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
       return `${day} ${month}`;
     });
   }
@@ -108,8 +111,12 @@ const LineChart = ({ currentData, previousData, currency = "US$", showPrevious =
   const labels = generateLabels(currentData.length > 0 ? currentData : previousData);
   
   // Format date range for display
+  // Use UTC date methods to avoid timezone conversion issues
   const formatDateLabel = (date: Date): string => {
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    // Extract UTC date parts to ensure consistent display
+    const day = date.getUTCDate();
+    const month = date.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+    return `${day} ${month}`;
   };
 
   const startDateLabel = startDate ? formatDateLabel(startDate) : "";

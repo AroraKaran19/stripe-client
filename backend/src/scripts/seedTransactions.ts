@@ -1,7 +1,20 @@
-import axios from "axios";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import { Transaction } from "../models/transaction.model";
+import { getUTCStartOfDay } from "../utils/dateUtils";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:5000/api";
-const API_BASE = API_BASE_URL.replace('/api', '');
+// Load environment variables
+dotenv.config();
+
+// Shared customer base for consistency with seedAnalytics.ts
+const SHARED_CUSTOMERS = [
+  { owner: "John Doe", email: "john.doe@example.com", id: "cus_johndoe123" },
+  { owner: "Jane Smith", email: "jane.smith@example.com", id: "cus_janesmith456" },
+  { owner: "Bob Johnson", email: "bob.johnson@example.com", id: "cus_bobjohnson789" },
+  { owner: "Alice Williams", email: "alice.williams@example.com", id: "cus_alicewilliams012" },
+  { owner: "Charlie Brown", email: "charlie.brown@example.com", id: "cus_charliebrown345" },
+  { owner: "Diana Prince", email: "diana.prince@example.com", id: "cus_dianaprince678" },
+];
 
 const generatePaymentId = () => {
   return `pm_${Math.random().toString(36).substr(2, 9)}`;
@@ -9,10 +22,6 @@ const generatePaymentId = () => {
 
 const generateFingerprint = () => {
   return `fp_${Math.random().toString(36).substr(2, 9)}`;
-};
-
-const generateCustomerId = () => {
-  return `cus_${Math.random().toString(36).substr(2, 9)}`;
 };
 
 const generateExpires = () => {
@@ -23,626 +32,201 @@ const generateExpires = () => {
   return `${expiresMonth} / ${expiresYear}`;
 };
 
-const testTransactions = [
-  // Succeeded transactions
-  {
-    amount: 125.99,
-    currency: "USD",
-    number: "4242",
-    owner: "John Doe",
-    owner_email: "john.doe@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "US",
-    address: "123 Main St, New York, NY 10001",
-    status: "succeeded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 60000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "4242",
-    },
-    description: "Premium Subscription - Monthly Plan",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+1 (555) 123-4567",
-    risk_evaluation: {
-      score: 25,
-      level: "low",
-    },
-    country: "US",
-    items: [
-      {
-        name: "Premium Subscription",
-        quantity: 1,
-        unit_price: 99.99,
-        total_price: 99.99,
-      },
-      {
-        name: "Processing Fee",
-        quantity: 1,
-        unit_price: 2.99,
-        total_price: 2.99,
-      },
-      {
-        name: "Taxes",
-        quantity: 1,
-        unit_price: 23.01,
-        total_price: 23.01,
-      },
-    ],
-  },
-  {
-    amount: 49.99,
-    currency: "USD",
-    number: "5555",
-    owner: "Jane Smith",
-    owner_email: "jane.smith@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "CA",
-    address: "456 Oak Avenue, Toronto, ON M5H 2N2",
-    status: "succeeded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 45000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 30000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "5555",
-    },
-    description: "Product Purchase - Digital Goods",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+1 (416) 555-7890",
-    risk_evaluation: {
-      score: 15,
-      level: "low",
-    },
-    country: "CA",
-    items: [
-      {
-        name: "Digital Product License",
-        quantity: 1,
-        unit_price: 39.99,
-        total_price: 39.99,
-      },
-      {
-        name: "Taxes",
-        quantity: 1,
-        unit_price: 10.0,
-        total_price: 10.0,
-      },
-    ],
-  },
-  {
-    amount: 299.50,
-    currency: "USD",
-    number: "8888",
-    owner: "Robert Johnson",
-    owner_email: "robert.j@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "GB",
-    address: "789 High Street, London, SW1A 1AA",
-    status: "succeeded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 120000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 90000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "8888",
-    },
-    description: "Annual Enterprise Plan",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+44 20 7946 0958",
-    risk_evaluation: {
-      score: 30,
-      level: "normal",
-    },
-    country: "GB",
-    items: [
-      {
-        name: "Enterprise Plan",
-        quantity: 1,
-        unit_price: 249.50,
-        total_price: 249.50,
-      },
-      {
-        name: "Setup Fee",
-        quantity: 1,
-        unit_price: 50.0,
-        total_price: 50.0,
-      },
-    ],
-  },
-  // Failed transactions
-  {
-    amount: 75.00,
-    currency: "USD",
-    number: "0001",
-    owner: "Alice Williams",
-    owner_email: "alice.w@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: false,
-    origin: "AU",
-    address: "321 Collins Street, Melbourne, VIC 3000",
-    status: "failed",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 180000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "0001",
-    },
-    description: "Subscription Payment - Declined",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+61 3 9999 1234",
-    risk_evaluation: {
-      score: 75,
-      level: "high",
-    },
-    country: "AU",
-    items: [
-      {
-        name: "Monthly Subscription",
-        quantity: 1,
-        unit_price: 75.0,
-        total_price: 75.0,
-      },
-    ],
-    decline_reason: "Insufficient funds",
-  },
-  {
-    amount: 150.00,
-    currency: "USD",
-    number: "9999",
-    owner: "Michael Brown",
-    owner_email: "michael.brown@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "DE",
-    address: "Hauptstraße 12, 10115 Berlin",
-    status: "failed",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 240000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "9999",
-    },
-    description: "Purchase Attempt - Card Declined",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+49 30 12345678",
-    risk_evaluation: {
-      score: 65,
-      level: "high",
-    },
-    country: "DE",
-    items: [
-      {
-        name: "Premium Package",
-        quantity: 1,
-        unit_price: 150.0,
-        total_price: 150.0,
-      },
-    ],
-    decline_reason: "Card expired",
-  },
-  // Refunded transactions
-  {
-    amount: 89.99,
-    currency: "USD",
-    number: "7777",
-    owner: "Sarah Davis",
-    owner_email: "sarah.davis@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "FR",
-    address: "15 Rue de la Paix, 75002 Paris",
-    status: "refunded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 86400000 * 2),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 86400000 * 2 + 60000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "7777",
-    },
-    description: "Product Purchase - Refunded",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+33 1 23 45 67 89",
-    risk_evaluation: {
-      score: 20,
-      level: "low",
-    },
-    country: "FR",
-    items: [
-      {
-        name: "Product Item",
-        quantity: 1,
-        unit_price: 79.99,
-        total_price: 79.99,
-      },
-      {
-        name: "Shipping Charge",
-        quantity: 1,
-        unit_price: 10.0,
-        total_price: 10.0,
-      },
-    ],
-    refunded_date: new Date(Date.now() - 86400000),
-  },
-  {
-    amount: 199.00,
-    currency: "USD",
-    number: "3333",
-    owner: "David Wilson",
-    owner_email: "david.wilson@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "JP",
-    address: "1-1-1 Shibuya, Shibuya City, Tokyo 150-0002",
-    status: "refunded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 86400000 * 5),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 86400000 * 5 + 45000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "3333",
-    },
-    description: "Service Subscription - Refunded",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+81 3-1234-5678",
-    risk_evaluation: {
-      score: 25,
-      level: "low",
-    },
-    country: "JP",
-    items: [
-      {
-        name: "Annual Service",
-        quantity: 1,
-        unit_price: 199.0,
-        total_price: 199.0,
-      },
-    ],
-    refunded_date: new Date(Date.now() - 86400000 * 3),
-  },
-  // Disputed transactions
-  {
-    amount: 349.99,
-    currency: "USD",
-    number: "6666",
-    owner: "Emily Martinez",
-    owner_email: "emily.martinez@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "ES",
-    address: "Calle Gran Vía, 1, 28013 Madrid",
-    status: "disputed",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 86400000 * 7),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 86400000 * 7 + 30000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "6666",
-    },
-    description: "Large Purchase - Under Dispute",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+34 91 123 45 67",
-    risk_evaluation: {
-      score: 50,
-      level: "normal",
-    },
-    country: "ES",
-    items: [
-      {
-        name: "Enterprise Package",
-        quantity: 1,
-        unit_price: 299.99,
-        total_price: 299.99,
-      },
-      {
-        name: "Setup Fee",
-        quantity: 1,
-        unit_price: 50.0,
-        total_price: 50.0,
-      },
-    ],
-  },
-  // Uncaptured transactions
-  {
-    amount: 59.99,
-    currency: "USD",
-    number: "2222",
-    owner: "Chris Anderson",
-    owner_email: "chris.anderson@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "IT",
-    address: "Via Roma, 10, 00100 Rome",
-    status: "uncaptured",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 3600000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 3300000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "2222",
-    },
-    description: "Payment Authorized - Not Captured",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+39 06 1234 5678",
-    risk_evaluation: {
-      score: 35,
-      level: "normal",
-    },
-    country: "IT",
-    items: [
-      {
-        name: "Service Package",
-        quantity: 1,
-        unit_price: 49.99,
-        total_price: 49.99,
-      },
-      {
-        name: "Processing Fee",
-        quantity: 1,
-        unit_price: 10.0,
-        total_price: 10.0,
-      },
-    ],
-  },
-  {
-    amount: 99.50,
-    currency: "USD",
-    number: "4444",
-    owner: "Lisa Taylor",
-    owner_email: "lisa.taylor@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "NL",
-    address: "Damrak 1, 1012 LG Amsterdam",
-    status: "uncaptured",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 7200000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 6900000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "4444",
-    },
-    description: "Pending Capture - Subscription",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+31 20 123 4567",
-    risk_evaluation: {
-      score: 28,
-      level: "low",
-    },
-    country: "NL",
-    items: [
-      {
-        name: "Monthly Subscription",
-        quantity: 1,
-        unit_price: 79.50,
-        total_price: 79.50,
-      },
-      {
-        name: "Taxes",
-        quantity: 1,
-        unit_price: 20.0,
-        total_price: 20.0,
-      },
-    ],
-  },
-  // Additional succeeded transaction with admin_date
-  {
-    amount: 179.99,
-    currency: "USD",
-    number: "1234",
-    owner: "Admin User",
-    owner_email: "admin@example.com",
-    fingerprint: generateFingerprint(),
-    expires: generateExpires(),
-    type: "Visa credit card",
-    issuer: "Stripe Payments UK Limited",
-    cvc_check: true,
-    origin: "US",
-    address: "100 Admin Blvd, San Francisco, CA 94105",
-    status: "succeeded",
-    activity_history: [
-      {
-        activity: "Started",
-        timestamp: new Date(Date.now() - 300000),
-      },
-      {
-        activity: "Authorized",
-        timestamp: new Date(Date.now() - 270000),
-      },
-    ],
-    payment_id: generatePaymentId(),
-    payment_method: {
-      card_type: "Visa",
-      cart_last_four: "1234",
-    },
-    description: "Admin Transaction - Test Data",
-    statement_descriptor: "VISUALIZE & BUILD LTD.",
-    customer_id: generateCustomerId(),
-    customer_phone: "+1 (415) 555-0000",
-    risk_evaluation: {
-      score: 18,
-      level: "low",
-    },
-    country: "US",
-    items: [
-      {
-        name: "Admin Package",
-        quantity: 1,
-        unit_price: 149.99,
-        total_price: 149.99,
-      },
-      {
-        name: "Setup Fee",
-        quantity: 1,
-        unit_price: 30.0,
-        total_price: 30.0,
-      },
-    ],
-    admin_date: new Date(Date.now() - 86400000),
-    transferred_to: "acct_test123",
-  },
-];
+// Generate transactions with UTC-normalized dates (consistent with seedAnalytics.ts)
+const generateTransactionsForDatabase = () => {
+  const now = new Date();
+  const transactions: any[] = [];
+  
+  const statuses = ["succeeded", "succeeded", "succeeded", "succeeded", "failed", "refunded"]; // More succeeded than failed/refunded
+  const amounts = [25.99, 49.99, 99.99, 149.99, 199.99, 299.99, 499.99, 799.99, 999.99];
+
+  // Current period - Last 7 days (for daily/hourly view)
+  for (let day = 0; day < 7; day++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - day);
+    // Normalize to UTC start of day
+    const utcDate = getUTCStartOfDay(date);
+    
+    // 3-8 transactions per day, distributed across hours
+    const transactionsPerDay = Math.floor(Math.random() * 6) + 3;
+    for (let i = 0; i < transactionsPerDay; i++) {
+      const hour = Math.floor(Math.random() * 24);
+      const minute = Math.floor(Math.random() * 60);
+      // Create UTC date with specific hour and minute
+      const transactionDate = new Date(utcDate);
+      transactionDate.setUTCHours(hour, minute, 0, 0);
+      
+      const customer = SHARED_CUSTOMERS[Math.floor(Math.random() * SHARED_CUSTOMERS.length)];
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      const amount = amounts[Math.floor(Math.random() * amounts.length)];
+      
+      transactions.push({
+        amount,
+        currency: "USD",
+        number: String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0"),
+        owner: customer.owner,
+        owner_email: customer.email,
+        customer_id: customer.id,
+        fingerprint: generateFingerprint(),
+        expires: generateExpires(),
+        type: "Visa credit card",
+        issuer: "Stripe Payments UK Limited",
+        cvc_check: true,
+        origin: "US",
+        address: "123 Main St, New York, NY 10001",
+        status,
+        admin_date: transactionDate, // UTC-normalized date for analytics
+        activity_history: [
+          {
+            activity: "Started",
+            timestamp: new Date(transactionDate.getTime() - 60000),
+          },
+          {
+            activity: status === "succeeded" ? "Authorized" : "Failed",
+            timestamp: transactionDate,
+          },
+        ],
+        payment_id: generatePaymentId(),
+        payment_method: {
+          card_type: "Visa",
+          cart_last_four: String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0"),
+        },
+        description: `${status === "succeeded" ? "Product Purchase" : status === "failed" ? "Failed Payment" : "Refund"}`,
+        statement_descriptor: "VISUALIZE & BUILD LTD.",
+        customer_phone: `+1 (555) ${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+        risk_evaluation: {
+          score: Math.floor(Math.random() * 50),
+          level: status === "failed" ? "high" : "low",
+        },
+        country: "US",
+        items: [
+          {
+            name: "Product",
+            quantity: 1,
+            unit_price: amount,
+            total_price: amount,
+          },
+        ],
+      });
+    }
+  }
+
+  // Previous period - 7 days before current (for comparison)
+  for (let day = 7; day < 14; day++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - day);
+    // Normalize to UTC start of day
+    const utcDate = getUTCStartOfDay(date);
+    
+    const transactionsPerDay = Math.floor(Math.random() * 5) + 2; // Fewer transactions in previous period
+    for (let i = 0; i < transactionsPerDay; i++) {
+      const hour = Math.floor(Math.random() * 24);
+      const minute = Math.floor(Math.random() * 60);
+      // Create UTC date with specific hour and minute
+      const transactionDate = new Date(utcDate);
+      transactionDate.setUTCHours(hour, minute, 0, 0);
+      
+      const customer = SHARED_CUSTOMERS[Math.floor(Math.random() * SHARED_CUSTOMERS.length)];
+      const status = statuses[Math.floor(Math.random() * statuses.length)];
+      const amount = amounts[Math.floor(Math.random() * amounts.length)];
+      
+      transactions.push({
+        amount,
+        currency: "USD",
+        number: String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0"),
+        owner: customer.owner,
+        owner_email: customer.email,
+        customer_id: customer.id,
+        fingerprint: generateFingerprint(),
+        expires: generateExpires(),
+        type: "Visa credit card",
+        issuer: "Stripe Payments UK Limited",
+        cvc_check: true,
+        origin: "US",
+        address: "123 Main St, New York, NY 10001",
+        status,
+        admin_date: transactionDate, // UTC-normalized date for analytics
+        activity_history: [
+          {
+            activity: "Started",
+            timestamp: new Date(transactionDate.getTime() - 60000),
+          },
+          {
+            activity: status === "succeeded" ? "Authorized" : "Failed",
+            timestamp: transactionDate,
+          },
+        ],
+        payment_id: generatePaymentId(),
+        payment_method: {
+          card_type: "Visa",
+          cart_last_four: String(Math.floor(Math.random() * 9000) + 1000).padStart(4, "0"),
+        },
+        description: `${status === "succeeded" ? "Product Purchase" : status === "failed" ? "Failed Payment" : "Refund"}`,
+        statement_descriptor: "VISUALIZE & BUILD LTD.",
+        customer_phone: `+1 (555) ${String(Math.floor(Math.random() * 900) + 100)}-${String(Math.floor(Math.random() * 9000) + 1000)}`,
+        risk_evaluation: {
+          score: Math.floor(Math.random() * 50),
+          level: status === "failed" ? "high" : "low",
+        },
+        country: "US",
+        items: [
+          {
+            name: "Product",
+            quantity: 1,
+            unit_price: amount,
+            total_price: amount,
+          },
+        ],
+      });
+    }
+  }
+
+  return transactions;
+};
 
 const seedTransactions = async () => {
   try {
-    console.log(`🔄 Connecting to API at ${API_BASE_URL}...`);
+    // Connect directly to MongoDB
+    const mongoURI = process.env.MONGODB_URI;
     
-    // Check if API is reachable
-    try {
-      await axios.get(`${API_BASE}/health`);
-      console.log("✅ API is reachable");
-    } catch (error) {
-      console.error(`❌ API is not reachable. Please make sure your backend server is running on ${API_BASE}`);
+    if (!mongoURI) {
+      console.error("❌ MONGODB_URI is not defined in environment variables.");
+      console.error("   Please make sure your .env file has MONGODB_URI set");
       process.exit(1);
     }
 
-    console.log("📝 Creating test transactions via API...");
-    const createdTransactions: any[] = [];
+    console.log("🔄 Connecting to MongoDB...");
+    await mongoose.connect(mongoURI);
+    console.log("✅ Connected to MongoDB");
+
+    console.log("\n📝 Generating UTC-normalized test transactions...");
+    const testTransactions = generateTransactionsForDatabase();
+    
+    console.log(`📊 Generated ${testTransactions.length} transactions for database seeding`);
+    console.log("   - Last 7 days: ~35 transactions (for daily/hourly views)");
+    console.log("   - Previous 7 days: ~25 transactions (for comparison)");
+    console.log("   - All dates normalized to UTC for consistency");
+    console.log("   - Shared customer base with seedAnalytics.ts");
+
+    console.log("\n📝 Creating transactions in database...");
+    
+    // Clear existing transactions (optional - comment out if you want to keep existing data)
+    // await Transaction.deleteMany({});
+    // console.log("🗑️  Cleared existing transactions");
+
+    // Insert all transactions at once (much faster than individual inserts)
+    const result = await Transaction.insertMany(testTransactions, { ordered: false });
+    
+    const createdCount = result.length;
     const statusCounts: Record<string, number> = {};
+    
+    // Count transactions by status
+    testTransactions.forEach((tx) => {
+      const status = tx.status || "unknown";
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
 
-    // Create transactions one by one using the API
-    for (const transaction of testTransactions) {
-      try {
-        const response = await axios.post(
-          `${API_BASE_URL}/transactions`,
-          transaction,
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (response.data && response.data.data) {
-          createdTransactions.push(response.data.data);
-          const status = response.data.data.status || "unknown";
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-          console.log(`   ✓ Created transaction: ${response.data.data.payment_id || response.data.data._id}`);
-        }
-      } catch (error: any) {
-        console.error(`   ✗ Failed to create transaction:`, error.response?.data?.message || error.message);
-      }
-    }
-
-    console.log(`\n✅ Successfully created ${createdTransactions.length} test transactions!`);
+    console.log(`\n✅ Successfully created ${createdCount} test transactions!`);
     
     console.log("\n📊 Transaction Summary:");
     Object.entries(statusCounts).forEach(([status, count]) => {
@@ -650,13 +234,20 @@ const seedTransactions = async () => {
     });
 
     console.log("\n🎉 Seed completed successfully!");
+    console.log("\n💡 Your transactions are now in the database with UTC-normalized dates");
+    console.log("   - Compatible with analytics snapshots from seedAnalytics.ts");
+    console.log("   - Consistent customer base across both seed scripts");
+    console.log("   - No server required - writes directly to MongoDB");
   } catch (error: any) {
     console.error("❌ Error seeding transactions:", error.message);
-    if (error.response) {
-      console.error("   Response:", error.response.data);
+    if (error.name === 'BulkWriteError' && error.writeErrors) {
+      console.error(`   ${error.writeErrors.length} transactions failed to insert`);
+      console.error("   Continuing with successfully inserted transactions...");
     }
     process.exit(1);
   } finally {
+    await mongoose.disconnect();
+    console.log("\n🔌 Disconnected from MongoDB");
     process.exit(0);
   }
 };

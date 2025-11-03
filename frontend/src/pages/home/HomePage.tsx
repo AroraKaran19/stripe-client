@@ -17,6 +17,7 @@ import NewCustomersCard from "./components/NewCustomersCard";
 import TopCustomersCard from "./components/TopCustomersCard";
 import AddSectionModal, { type SectionType } from "./components/AddSectionModal";
 import { analyticsService, type AnalyticsData } from "../../services/analytics.service";
+import { normalizeToUTC } from "../../utils/dateUtils";
 import { X } from "lucide-react";
 
 interface DateRange {
@@ -55,6 +56,9 @@ const Homepage = () => {
   const [overviewAnalytics, setOverviewAnalytics] = useState<AnalyticsData | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  // Separate state for top section analytics
+  const [topAnalytics, setTopAnalytics] = useState<AnalyticsData | null>(null);
+  const [topLoading, setTopLoading] = useState(true);
   const [sections, setSections] = useState<SectionType[]>([
     "payments",
     "grossVolume",
@@ -68,16 +72,14 @@ const Homepage = () => {
   const [draggedSection, setDraggedSection] = useState<SectionType | null>(null);
   const [dragOverSection, setDragOverSection] = useState<SectionType | null>(null);
 
-  // Fetch analytics for the top chart only (single selected day, hourly)
+  // Fetch analytics for the top section (top metric overview)
   useEffect(() => {
     const fetchAnalytics = async () => {
-      setOverviewLoading(true);
-      setOverviewError(null);
+      setTopLoading(true);
       try {
-        const start = new Date(topSelectedDate);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(topSelectedDate);
-        end.setHours(23, 59, 59, 999);
+        // Normalize dates to UTC start/end of day
+        const start = normalizeToUTC(topSelectedDate, false);
+        const end = normalizeToUTC(topSelectedDate, true);
 
         const response = await analyticsService.getAnalytics(
           "custom",
@@ -86,12 +88,11 @@ const Homepage = () => {
           end,
           "previous_period"
         );
-        setOverviewAnalytics(response.data);
+        setTopAnalytics(response.data);
       } catch (err) {
-        setOverviewError(err instanceof Error ? err.message : "Failed to fetch analytics");
         console.error("Error fetching analytics:", err);
       } finally {
-        setOverviewLoading(false);
+        setTopLoading(false);
       }
     };
 
@@ -112,11 +113,12 @@ const Homepage = () => {
 
         const effectiveFrequency = isSingleDay ? "hourly" : overviewFrequency;
 
+        // Normalize dates to UTC start/end of day
         const response = await analyticsService.getAnalytics(
           "custom",
           effectiveFrequency,
-          overviewDateRange.start,
-          overviewDateRange.end,
+          normalizeToUTC(overviewDateRange.start, false),
+          normalizeToUTC(overviewDateRange.end, true),
           overviewCompareOption || "none"
         );
         setOverviewAnalytics(response.data);
@@ -139,30 +141,30 @@ const Homepage = () => {
   ];
 
   const getCurrentMetricValue = () => {
-    if (!overviewAnalytics) return 0;
+    if (!topAnalytics) return 0;
     switch (selectedMetric) {
       case "gross_volume":
-        return overviewAnalytics.grossVolume.current;
+        return topAnalytics.grossVolume.current;
       case "net_volume":
-        return overviewAnalytics.netVolume.current;
+        return topAnalytics.netVolume.current;
       case "new_customers":
-        return overviewAnalytics.newCustomers.current;
+        return topAnalytics.newCustomers.current;
       case "successful_payments":
-        return overviewAnalytics.payments.filter((p: any) => p.status === "succeeded").length;
+        return topAnalytics.payments.filter((p: any) => p.status === "succeeded").length;
       default:
         return 0;
     }
   };
 
   const getPreviousMetricValue = () => {
-    if (!overviewAnalytics) return 0;
+    if (!topAnalytics) return 0;
     switch (selectedMetric) {
       case "gross_volume":
-        return overviewAnalytics.grossVolume.previous;
+        return topAnalytics.grossVolume.previous;
       case "net_volume":
-        return overviewAnalytics.netVolume.previous;
+        return topAnalytics.netVolume.previous;
       case "new_customers":
-        return overviewAnalytics.newCustomers.previous;
+        return topAnalytics.newCustomers.previous;
       case "successful_payments":
         // For successful payments, we'd need previous period payments data
         // For now, return 0 or calculate from failed payments if available
@@ -173,18 +175,18 @@ const Homepage = () => {
   };
 
   const getMetricTimeSeries = () => {
-    if (!overviewAnalytics) return { current: [], previous: [] };
+    if (!topAnalytics) return { current: [], previous: [] };
     switch (selectedMetric) {
       case "gross_volume":
-        return overviewAnalytics.grossVolume.timeSeries;
+        return topAnalytics.grossVolume.timeSeries;
       case "net_volume":
-        return overviewAnalytics.netVolume.timeSeries;
+        return topAnalytics.netVolume.timeSeries;
       case "new_customers":
-        return overviewAnalytics.newCustomers.timeSeries;
+        return topAnalytics.newCustomers.timeSeries;
       case "successful_payments":
         // For successful payments, we'd need to generate time series from payments
         // For now, return empty or use gross volume as placeholder
-        return overviewAnalytics.grossVolume.timeSeries;
+        return topAnalytics.grossVolume.timeSeries;
       default:
         return { current: [], previous: [] };
     }
@@ -198,21 +200,26 @@ const Homepage = () => {
   };
 
   const formatSelectedDate = (date: Date): string => {
+    // Use UTC dates for consistent comparison
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
+    const todayUTC = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayUTC = new Date(todayUTC);
+    yesterdayUTC.setDate(yesterdayUTC.getDate() - 1);
     
-    // Check if it's yesterday
-    if (date.toDateString() === yesterday.toDateString()) {
+    // Normalize input date to UTC for comparison
+    const dateUTC = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    // Check if it's yesterday (UTC)
+    if (dateUTC.getTime() === yesterdayUTC.getTime()) {
       return "Yesterday";
     }
     
-    // Check if it's today
-    if (date.toDateString() === today.toDateString()) {
+    // Check if it's today (UTC)
+    if (dateUTC.getTime() === todayUTC.getTime()) {
       return "Today";
     }
     
-    // Otherwise show formatted date
+    // Otherwise show formatted date (using local methods for consistency)
     const day = date.getDate();
     const month = date.toLocaleString("en-US", { month: "short" });
     const year = date.getFullYear();
@@ -554,7 +561,7 @@ const Homepage = () => {
       <div className="w-full">
       <div className="w-full">
       <h1 className="text-3xl font-bold py-2 border-b border-[#e5e7eb]">
-        Today
+        {formatSelectedDate(topSelectedDate)}
       </h1>
       <div className="mt-6 w-full flex flex-col lg:flex-row gap-4 justify-between items-stretch">
         <div className="flex flex-col w-full">
@@ -681,7 +688,7 @@ const Homepage = () => {
               endDate={topSelectedDate}
             />
         </div>
-        <HeroSection />
+        <HeroSection data={topAnalytics} loading={topLoading} />
       </div>
       </div>
       <SecondSectionHeader

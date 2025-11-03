@@ -14,12 +14,14 @@ export const getAnalyticsHandler = asyncHandler(
     
     if (req.query.startDate) {
       customStart = new Date(req.query.startDate as string);
-      customStart.setHours(0, 0, 0, 0);
+      // Use UTC methods to avoid timezone shift
+      customStart.setUTCHours(0, 0, 0, 0);
     }
     
     if (req.query.endDate) {
       customEnd = new Date(req.query.endDate as string);
-      customEnd.setHours(23, 59, 59, 999);
+      // Use UTC methods to avoid timezone shift
+      customEnd.setUTCHours(23, 59, 59, 999);
     }
 
     const analytics = await getAnalytics(

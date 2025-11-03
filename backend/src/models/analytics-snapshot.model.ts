@@ -54,8 +54,7 @@ const AnalyticsSnapshotSchema = new Schema(
       default: "calculated",
     },
     hourlyBreakdown: {
-      type: Map,
-      of: Number,
+      type: Schema.Types.Mixed,
       default: {},
     },
     notes: {

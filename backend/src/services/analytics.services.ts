@@ -1,5 +1,7 @@
 import { Transaction, ITransaction } from "../models/transaction.model";
 import { AppError } from "../middleware/error.middleware";
+import { AnalyticsSnapshot } from "../models/analytics-snapshot.model";
+import { normalizeToUTC } from "../utils/dateUtils";
 
 interface DateRange {
   start: Date;
@@ -68,62 +70,62 @@ const calculateDateRange = (
   // Use custom dates if provided
   if (customStart && customEnd) {
     currentStart = new Date(customStart);
-    currentStart.setHours(0, 0, 0, 0);
+    currentStart.setUTCHours(0, 0, 0, 0);
     currentEnd = new Date(customEnd);
-    currentEnd.setHours(23, 59, 59, 999);
+    currentEnd.setUTCHours(23, 59, 59, 999);
   } else {
     currentEnd = new Date(now);
-    currentEnd.setHours(23, 59, 59, 999);
+    currentEnd.setUTCHours(23, 59, 59, 999);
 
     // Calculate current period start based on date range
     switch (dateRange) {
       case "today":
         currentStart = new Date(now);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "last_7_days":
         currentStart = new Date(now);
         // Include today => start 6 days ago
         currentStart.setDate(currentStart.getDate() - 6);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "last_4_weeks":
         currentStart = new Date(now);
         currentStart.setDate(currentStart.getDate() - 27);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "last_30_days":
         currentStart = new Date(now);
         currentStart.setDate(currentStart.getDate() - 30);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "month_to_date":
         currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "quarter_to_date":
         const quarter = Math.floor(now.getMonth() / 3);
         currentStart = new Date(now.getFullYear(), quarter * 3, 1);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "all_time":
         currentStart = new Date(2000, 0, 1);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "last_90_days":
         currentStart = new Date(now);
         currentStart.setDate(currentStart.getDate() - 90);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       case "last_12_months":
         currentStart = new Date(now);
         currentStart.setMonth(currentStart.getMonth() - 12);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
         break;
       default:
         currentStart = new Date(now);
         currentStart.setDate(currentStart.getDate() - 7);
-        currentStart.setHours(0, 0, 0, 0);
+        currentStart.setUTCHours(0, 0, 0, 0);
     }
   }
 
@@ -141,17 +143,17 @@ const calculateDateRange = (
     case "previous_week":
       // Previous week (7 days before current period)
       previousEnd = new Date(currentStart.getTime() - 1);
-      previousEnd.setHours(23, 59, 59, 999);
+      previousEnd.setUTCHours(23, 59, 59, 999);
       previousStart = new Date(previousEnd);
       previousStart.setDate(previousStart.getDate() - 6);
-      previousStart.setHours(0, 0, 0, 0);
+      previousStart.setUTCHours(0, 0, 0, 0);
       break;
     case "previous_month":
       // Previous month (same calendar month before)
       const prevMonth = new Date(currentStart);
       prevMonth.setMonth(prevMonth.getMonth() - 1);
       previousStart = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
-      previousStart.setHours(0, 0, 0, 0);
+      previousStart.setUTCHours(0, 0, 0, 0);
       const daysInPrevMonth = new Date(
         prevMonth.getFullYear(),
         prevMonth.getMonth() + 1,
@@ -162,7 +164,7 @@ const calculateDateRange = (
         prevMonth.getMonth(),
         daysInPrevMonth
       );
-      previousEnd.setHours(23, 59, 59, 999);
+      previousEnd.setUTCHours(23, 59, 59, 999);
       break;
     case "previous_year":
       // Previous year (same period last year)
@@ -179,8 +181,13 @@ const calculateDateRange = (
     case "previous_period":
     default:
       // Overlay previous period: go back duration from current start
-      previousEnd = new Date(currentStart.getTime() - 1);
+      // Calculate properly for day boundaries
+      previousEnd = new Date(currentStart.getTime() - 1000); // 1 second before current start
+      // Set to end of that day (23:59:59.999)
+      previousEnd.setUTCHours(23, 59, 59, 999);
       previousStart = new Date(previousEnd.getTime() - duration);
+      // Set to start of that day (00:00:00.000)
+      previousStart.setUTCHours(0, 0, 0, 0);
       break;
   }
 
@@ -191,15 +198,16 @@ const calculateDateRange = (
 };
 
 const formatLocalDate = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const da = String(d.getDate()).padStart(2, "0");
+  // Use UTC methods to avoid timezone conversion issues
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const da = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${da}`;
 };
 
 const formatLocalHourKey = (d: Date): string => {
   const base = formatLocalDate(d);
-  const h = String(d.getHours()).padStart(2, "0");
+  const h = String(d.getUTCHours()).padStart(2, "0");
   return `${base}T${h}:00:00`;
 };
 
@@ -215,9 +223,9 @@ const generateTimeSeries = (
   if (frequency === "hourly") {
     // For hourly, only show data for one day (the end date)
     const singleDayStart = new Date(end);
-    singleDayStart.setHours(0, 0, 0, 0);
+    singleDayStart.setUTCHours(0, 0, 0, 0);
     const singleDayEnd = new Date(end);
-    singleDayEnd.setHours(23, 59, 59, 999);
+    singleDayEnd.setUTCHours(23, 59, 59, 999);
     
     // Group by hour for the selected day only
     const hourlyMap = new Map<string, number>();
@@ -243,7 +251,7 @@ const generateTimeSeries = (
         date: hourKey,
         value: hourlyMap.get(hourKey) || 0,
       });
-      currentDate.setHours(currentDate.getHours() + 1);
+      currentDate.setUTCHours(currentDate.getUTCHours() + 1);
     }
   } else if (frequency === "daily") {
     // Group by day
@@ -325,7 +333,7 @@ const generateTimeSeries = (
 
 const getWeekKey = (date: Date): string => {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
+  d.setUTCHours(0, 0, 0, 0);
   d.setDate(d.getDate() - d.getDay()); // Start of week (Sunday)
   return d.toISOString().split("T")[0];
 };
@@ -342,9 +350,9 @@ const generateCustomerTimeSeries = (
   if (frequency === "hourly") {
     // For hourly, only show data for one day (the end date)
     const singleDayStart = new Date(end);
-    singleDayStart.setHours(0, 0, 0, 0);
+    singleDayStart.setUTCHours(0, 0, 0, 0);
     const singleDayEnd = new Date(end);
-    singleDayEnd.setHours(23, 59, 59, 999);
+    singleDayEnd.setUTCHours(23, 59, 59, 999);
     
     const hourlyMap = new Map<string, Set<string>>();
     transactions.forEach((tx) => {
@@ -370,7 +378,7 @@ const generateCustomerTimeSeries = (
         date: hourKey,
         value: hourlyMap.get(hourKey)?.size || 0,
       });
-      currentDate.setHours(currentDate.getHours() + 1);
+      currentDate.setUTCHours(currentDate.getUTCHours() + 1);
     }
   } else if (frequency === "daily") {
     const dailyMap = new Map<string, Set<string>>();
@@ -461,6 +469,58 @@ export const getAnalytics = async (
   try {
     const ranges = calculateDateRange(dateRange, frequency, customStart, customEnd, compareOption);
 
+    // Normalize dates for snapshot queries to UTC (snapshots are stored with UTC times)
+    const currentStart = normalizeToUTC(ranges.current.start, false);
+    const currentEnd = normalizeToUTC(ranges.current.end, true);
+    
+    const previousStart = normalizeToUTC(ranges.previous.start, false);
+    const previousEnd = normalizeToUTC(ranges.previous.end, true);
+
+    // First, check if ANY snapshots exist in this date range
+    const allSnapshotsInRange = await AnalyticsSnapshot.find({
+      date: {
+        $gte: currentStart,
+        $lte: currentEnd,
+      },
+      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
+    });
+
+    // Fetch manual snapshots for current and previous periods
+    const currentManualSnapshots = await AnalyticsSnapshot.find({
+      date: {
+        $gte: currentStart,
+        $lte: currentEnd,
+      },
+      source: "manual",
+      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
+    });
+
+    const previousManualSnapshots = await AnalyticsSnapshot.find({
+      date: {
+        $gte: previousStart,
+        $lte: previousEnd,
+      },
+      source: "manual",
+      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
+    });
+
+
+    // Helper function to sum manual snapshots for a specific metric
+    const sumManualSnapshots = (snapshots: any[], metric: string): number => {
+      return snapshots
+        .filter((s) => s.metric === metric)
+        .reduce((sum, s) => sum + (s.value || 0), 0);
+    };
+
+    // Check if manual snapshots exist for each metric in the current period
+    // If ANY manual snapshots exist for a metric in the date range, use them exclusively
+    const hasManualGrossVolume = currentManualSnapshots.length > 0 && 
+      currentManualSnapshots.some((s) => s.metric === "gross_volume");
+    const hasManualNetVolume = currentManualSnapshots.length > 0 && 
+      currentManualSnapshots.some((s) => s.metric === "net_volume");
+    const hasManualNewCustomers = currentManualSnapshots.length > 0 && 
+      currentManualSnapshots.some((s) => s.metric === "new_customers");
+
     // Fetch transactions for current period
     const currentTransactions = await Transaction.find({
       admin_date: {
@@ -477,14 +537,20 @@ export const getAnalytics = async (
       },
     }).sort({ admin_date: 1 });
 
-    // Calculate Gross Volume (sum of all succeeded transactions)
-    const currentGrossVolume = currentTransactions
+    // Calculate Gross Volume (use manual snapshots if available, otherwise calculate from transactions)
+    let currentGrossVolume = currentTransactions
       .filter((tx) => tx.status === "succeeded")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    const previousGrossVolume = previousTransactions
+    let previousGrossVolume = previousTransactions
       .filter((tx) => tx.status === "succeeded")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+    // Override with manual snapshots if they exist
+    if (hasManualGrossVolume) {
+      currentGrossVolume = sumManualSnapshots(currentManualSnapshots, "gross_volume");
+      previousGrossVolume = sumManualSnapshots(previousManualSnapshots, "gross_volume");
+    }
 
     const grossVolumeChange = currentGrossVolume - previousGrossVolume;
     const grossVolumeChangePercent =
@@ -494,7 +560,7 @@ export const getAnalytics = async (
         ? 100
         : 0;
 
-    // Calculate Net Volume (gross volume minus refunded transactions)
+    // Calculate Net Volume (use manual snapshots if available, otherwise calculate from transactions)
     const currentRefundedAmount = currentTransactions
       .filter((tx) => tx.status === "refunded")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
@@ -503,8 +569,14 @@ export const getAnalytics = async (
       .filter((tx) => tx.status === "refunded")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    const currentNetVolume = currentGrossVolume - currentRefundedAmount;
-    const previousNetVolume = previousGrossVolume - previousRefundedAmount;
+    let currentNetVolume = currentGrossVolume - currentRefundedAmount;
+    let previousNetVolume = previousGrossVolume - previousRefundedAmount;
+
+    // Override with manual snapshots if they exist
+    if (hasManualNetVolume) {
+      currentNetVolume = sumManualSnapshots(currentManualSnapshots, "net_volume");
+      previousNetVolume = sumManualSnapshots(previousManualSnapshots, "net_volume");
+    }
 
     const netVolumeChange = currentNetVolume - previousNetVolume;
     const netVolumeChangePercent =
@@ -545,11 +617,17 @@ export const getAnalytics = async (
     });
 
     // New customers = customers in current period that weren't in previous period
-    const newCustomersCount = Array.from(currentCustomerSet).filter(
+    let newCustomersCount = Array.from(currentCustomerSet).filter(
       (customer) => !previousCustomerSet.has(customer)
     ).length;
 
-    const previousNewCustomersCount = Array.from(previousCustomerSet).length;
+    let previousNewCustomersCount = Array.from(previousCustomerSet).length;
+
+    // Override with manual snapshots if they exist
+    if (hasManualNewCustomers) {
+      newCustomersCount = Math.round(sumManualSnapshots(currentManualSnapshots, "new_customers"));
+      previousNewCustomersCount = Math.round(sumManualSnapshots(previousManualSnapshots, "new_customers"));
+    }
     const newCustomersChange = newCustomersCount - previousNewCustomersCount;
     const newCustomersChangePercent =
       previousNewCustomersCount !== 0
