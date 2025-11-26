@@ -1,6 +1,5 @@
 import { Transaction, ITransaction } from "../models/transaction.model";
 import { AppError } from "../middleware/error.middleware";
-import { AnalyticsSnapshot } from "../models/analytics-snapshot.model";
 import { normalizeToUTC } from "../utils/dateUtils";
 
 interface DateRange {
@@ -469,57 +468,6 @@ export const getAnalytics = async (
   try {
     const ranges = calculateDateRange(dateRange, frequency, customStart, customEnd, compareOption);
 
-    // Normalize dates for snapshot queries to UTC (snapshots are stored with UTC times)
-    const currentStart = normalizeToUTC(ranges.current.start, false);
-    const currentEnd = normalizeToUTC(ranges.current.end, true);
-    
-    const previousStart = normalizeToUTC(ranges.previous.start, false);
-    const previousEnd = normalizeToUTC(ranges.previous.end, true);
-
-    // First, check if ANY snapshots exist in this date range
-    const allSnapshotsInRange = await AnalyticsSnapshot.find({
-      date: {
-        $gte: currentStart,
-        $lte: currentEnd,
-      },
-      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
-    });
-
-    // Fetch manual snapshots for current and previous periods
-    const currentManualSnapshots = await AnalyticsSnapshot.find({
-      date: {
-        $gte: currentStart,
-        $lte: currentEnd,
-      },
-      source: "manual",
-      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
-    });
-
-    const previousManualSnapshots = await AnalyticsSnapshot.find({
-      date: {
-        $gte: previousStart,
-        $lte: previousEnd,
-      },
-      source: "manual",
-      metric: { $in: ["gross_volume", "net_volume", "new_customers"] },
-    });
-
-
-    // Helper function to sum manual snapshots for a specific metric
-    const sumManualSnapshots = (snapshots: any[], metric: string): number => {
-      return snapshots
-        .filter((s) => s.metric === metric)
-        .reduce((sum, s) => sum + (s.value || 0), 0);
-    };
-
-    // Check if manual snapshots exist for each metric in the current period
-    // If ANY manual snapshots exist for a metric in the date range, use them exclusively
-    const hasManualGrossVolume = currentManualSnapshots.length > 0 && 
-      currentManualSnapshots.some((s) => s.metric === "gross_volume");
-    const hasManualNetVolume = currentManualSnapshots.length > 0 && 
-      currentManualSnapshots.some((s) => s.metric === "net_volume");
-    const hasManualNewCustomers = currentManualSnapshots.length > 0 && 
-      currentManualSnapshots.some((s) => s.metric === "new_customers");
 
     // Fetch transactions for current period
     const currentTransactions = await Transaction.find({
@@ -546,12 +494,6 @@ export const getAnalytics = async (
       .filter((tx) => tx.status === "succeeded")
       .reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
-    // Override with manual snapshots if they exist
-    if (hasManualGrossVolume) {
-      currentGrossVolume = sumManualSnapshots(currentManualSnapshots, "gross_volume");
-      previousGrossVolume = sumManualSnapshots(previousManualSnapshots, "gross_volume");
-    }
-
     const grossVolumeChange = currentGrossVolume - previousGrossVolume;
     const grossVolumeChangePercent =
       previousGrossVolume !== 0
@@ -571,12 +513,6 @@ export const getAnalytics = async (
 
     let currentNetVolume = currentGrossVolume - currentRefundedAmount;
     let previousNetVolume = previousGrossVolume - previousRefundedAmount;
-
-    // Override with manual snapshots if they exist
-    if (hasManualNetVolume) {
-      currentNetVolume = sumManualSnapshots(currentManualSnapshots, "net_volume");
-      previousNetVolume = sumManualSnapshots(previousManualSnapshots, "net_volume");
-    }
 
     const netVolumeChange = currentNetVolume - previousNetVolume;
     const netVolumeChangePercent =
@@ -622,12 +558,6 @@ export const getAnalytics = async (
     ).length;
 
     let previousNewCustomersCount = Array.from(previousCustomerSet).length;
-
-    // Override with manual snapshots if they exist
-    if (hasManualNewCustomers) {
-      newCustomersCount = Math.round(sumManualSnapshots(currentManualSnapshots, "new_customers"));
-      previousNewCustomersCount = Math.round(sumManualSnapshots(previousManualSnapshots, "new_customers"));
-    }
     const newCustomersChange = newCustomersCount - previousNewCustomersCount;
     const newCustomersChangePercent =
       previousNewCustomersCount !== 0

@@ -16,7 +16,16 @@ import FailedPaymentsCard from "./components/FailedPaymentsCard";
 import NewCustomersCard from "./components/NewCustomersCard";
 import TopCustomersCard from "./components/TopCustomersCard";
 import AddSectionModal, { type SectionType } from "./components/AddSectionModal";
-import { analyticsService, type AnalyticsData } from "../../services/analytics.service";
+import { analyticsService } from "../../services/analytics.service";
+import type { AnalyticsData } from "../../services/analytics.service";
+import { topSectionCardService } from "../../services/top-section-card.service";
+import type { TopSectionCardData } from "../../services/top-section-card.service";
+import { grossVolumeCardService } from "../../services/gross-volume-card.service";
+import { netVolumeCardService } from "../../services/net-volume-card.service";
+import { paymentsCardService } from "../../services/payments-card.service";
+import { failedPaymentsCardService } from "../../services/failed-payments-card.service";
+import { newCustomersCardService } from "../../services/new-customers-card.service";
+import { topCustomersCardService } from "../../services/top-customers-card.service";
 import { normalizeToUTC } from "../../utils/dateUtils";
 import { X } from "lucide-react";
 
@@ -77,18 +86,84 @@ const Homepage = () => {
     const fetchAnalytics = async () => {
       setTopLoading(true);
       try {
-        // Normalize dates to UTC start/end of day
-        const start = normalizeToUTC(topSelectedDate, false);
-        const end = normalizeToUTC(topSelectedDate, true);
+        // First, try to fetch from top section card service
+        let topSectionData: TopSectionCardData | null = null;
+        try {
+          const topSectionResponse = await topSectionCardService.getByDate(topSelectedDate);
+          if (topSectionResponse.data && !Array.isArray(topSectionResponse.data)) {
+            topSectionData = topSectionResponse.data as TopSectionCardData;
+          }
+        } catch (topSectionErr) {
+          console.log("No top section card data found, falling back to analytics");
+        }
 
-        const response = await analyticsService.getAnalytics(
-          "custom",
-          "hourly",
-          start,
-          end,
-          "previous_period"
-        );
-        setTopAnalytics(response.data);
+        // If we have top section card data, convert it to AnalyticsData format
+        if (topSectionData) {
+          // Helper function to convert TimeSeriesData to TimeSeriesPoint
+          const convertTimeSeries = (data: { timestamp: Date; value: number }[]) => {
+            return data.map(item => ({
+              date: new Date(item.timestamp).toISOString(),
+              value: item.value
+            }));
+          };
+
+          const analyticsData: AnalyticsData = {
+            grossVolume: {
+              current: topSectionData.grossVolume.current,
+              previous: topSectionData.grossVolume.previous,
+              change: topSectionData.grossVolume.current - topSectionData.grossVolume.previous,
+              changePercent: topSectionData.grossVolume.previous !== 0
+                ? ((topSectionData.grossVolume.current - topSectionData.grossVolume.previous) / topSectionData.grossVolume.previous) * 100
+                : 0,
+              timeSeries: {
+                current: convertTimeSeries(topSectionData.grossVolume.timeSeries.current),
+                previous: convertTimeSeries(topSectionData.grossVolume.timeSeries.previous),
+              },
+            },
+            netVolume: {
+              current: topSectionData.netVolume.current,
+              previous: topSectionData.netVolume.previous,
+              change: topSectionData.netVolume.current - topSectionData.netVolume.previous,
+              changePercent: topSectionData.netVolume.previous !== 0
+                ? ((topSectionData.netVolume.current - topSectionData.netVolume.previous) / topSectionData.netVolume.previous) * 100
+                : 0,
+              timeSeries: {
+                current: convertTimeSeries(topSectionData.netVolume.timeSeries.current),
+                previous: convertTimeSeries(topSectionData.netVolume.timeSeries.previous),
+              },
+            },
+            newCustomers: {
+              current: topSectionData.newCustomers.current,
+              previous: topSectionData.newCustomers.previous,
+              change: topSectionData.newCustomers.current - topSectionData.newCustomers.previous,
+              changePercent: topSectionData.newCustomers.previous !== 0
+                ? ((topSectionData.newCustomers.current - topSectionData.newCustomers.previous) / topSectionData.newCustomers.previous) * 100
+                : 0,
+              timeSeries: {
+                current: convertTimeSeries(topSectionData.newCustomers.timeSeries.current),
+                previous: convertTimeSeries(topSectionData.newCustomers.timeSeries.previous),
+              },
+            },
+            payments: [], // Not needed for top section
+            failedPayments: [],
+            topCustomersBySpend: [],
+            updatedAt: topSectionData.updatedAt,
+          };
+          setTopAnalytics(analyticsData);
+        } else {
+          // Fall back to analytics service
+          const start = normalizeToUTC(topSelectedDate, false);
+          const end = normalizeToUTC(topSelectedDate, true);
+
+          const response = await analyticsService.getAnalytics(
+            "custom",
+            "hourly",
+            start,
+            end,
+            "previous_period"
+          );
+          setTopAnalytics(response.data);
+        }
       } catch (err) {
         console.error("Error fetching analytics:", err);
       } finally {
@@ -121,7 +196,486 @@ const Homepage = () => {
           normalizeToUTC(overviewDateRange.end, true),
           overviewCompareOption || "none"
         );
-        setOverviewAnalytics(response.data);
+        
+        let analyticsData = response.data;
+
+        // For single day: fetch manual card data with hourly breakdown
+        // For date range: fetch manual card data for the entire range
+        if (isSingleDay) {
+          // Single day - fetch hourly data
+          const selectedDate = overviewDateRange.start;
+          // Fetching manual card data for single day
+          
+          try {
+            const [grossVolumeCard, netVolumeCard, paymentsCard, failedPaymentsCard, newCustomersCard, topCustomersCard] = await Promise.allSettled([
+              grossVolumeCardService.getByDate(selectedDate),
+              netVolumeCardService.getByDate(selectedDate),
+              paymentsCardService.getByDate(selectedDate),
+              failedPaymentsCardService.getByDate(selectedDate),
+              newCustomersCardService.getByDate(selectedDate),
+              topCustomersCardService.getByDate(selectedDate),
+            ]);
+
+            // Manual card data fetched
+
+            // Override with manual data if available
+            if (grossVolumeCard.status === 'fulfilled' && grossVolumeCard.value.data && !Array.isArray(grossVolumeCard.value.data)) {
+              const data = grossVolumeCard.value.data;
+              // Overriding Gross Volume with manual data
+              
+              // Convert timeSeries if available
+              let timeSeriesCurrent = analyticsData.grossVolume.timeSeries.current;
+              if (data.timeSeries && data.timeSeries.length > 0) {
+                // Create a map of existing hourly data
+                const hourlyMap = new Map();
+                data.timeSeries.forEach(ts => {
+                  const hour = new Date(ts.timestamp).getUTCHours();
+                  hourlyMap.set(hour, ts.value);
+                });
+                
+                // Build complete hourly timeSeries for ALL 24 hours (fill missing with 0)
+                timeSeriesCurrent = [];
+                for (let hour = 0; hour < 24; hour++) {
+                  const timestamp = new Date(Date.UTC(
+                    selectedDate.getFullYear(),
+                    selectedDate.getMonth(),
+                    selectedDate.getDate(),
+                    hour,
+                    0, 0, 0
+                  ));
+                  
+                  timeSeriesCurrent.push({
+                    date: timestamp.toISOString(),
+                    value: hourlyMap.get(hour) || 0, // Use 0 for missing hours
+                  });
+                }
+                
+                // Gross Volume timeSeries processed
+              }
+              
+              analyticsData.grossVolume = {
+                ...analyticsData.grossVolume,
+                current: data.value,
+                change: data.change,
+                changePercent: data.changePercent,
+                timeSeries: {
+                  ...analyticsData.grossVolume.timeSeries,
+                  current: timeSeriesCurrent,
+                },
+              };
+            }
+
+            if (netVolumeCard.status === 'fulfilled' && netVolumeCard.value.data && !Array.isArray(netVolumeCard.value.data)) {
+              const data = netVolumeCard.value.data;
+              // Overriding Net Volume with manual data
+              
+              // Convert timeSeries if available
+              let timeSeriesCurrent = analyticsData.netVolume.timeSeries.current;
+              if (data.timeSeries && data.timeSeries.length > 0) {
+                // Create a map of existing hourly data
+                const hourlyMap = new Map();
+                data.timeSeries.forEach(ts => {
+                  const hour = new Date(ts.timestamp).getUTCHours();
+                  hourlyMap.set(hour, ts.value);
+                });
+                
+                // Build complete hourly timeSeries for ALL 24 hours (fill missing with 0)
+                timeSeriesCurrent = [];
+                for (let hour = 0; hour < 24; hour++) {
+                  const timestamp = new Date(Date.UTC(
+                    selectedDate.getFullYear(),
+                    selectedDate.getMonth(),
+                    selectedDate.getDate(),
+                    hour,
+                    0, 0, 0
+                  ));
+                  
+                  timeSeriesCurrent.push({
+                    date: timestamp.toISOString(),
+                    value: hourlyMap.get(hour) || 0,
+                  });
+                }
+                
+                // Net Volume timeSeries processed
+              }
+              
+              analyticsData.netVolume = {
+                ...analyticsData.netVolume,
+                current: data.value,
+                change: data.change,
+                changePercent: data.changePercent,
+                timeSeries: {
+                  ...analyticsData.netVolume.timeSeries,
+                  current: timeSeriesCurrent,
+                },
+              };
+            }
+
+            if (paymentsCard.status === 'fulfilled' && paymentsCard.value.data && !Array.isArray(paymentsCard.value.data)) {
+              const data = paymentsCard.value.data;
+              // Overriding Payments with manual data
+              
+              // Convert payment transactions to Transaction format
+              if (data.transactions && data.transactions.length > 0) {
+                analyticsData.payments = data.transactions.map((t, index) => ({
+                  _id: t.id,
+                  amount: t.amount,
+                  currency: "USD",
+                  number: `#${index + 1}`,
+                  owner: "Customer",
+                  owner_email: "customer@example.com",
+                  fingerprint: "",
+                  expires: "",
+                  type: "card",
+                  issuer: "Visa",
+                  cvc_check: true,
+                  origin: "online",
+                  address: "",
+                  status: t.status === "successful" ? "succeeded" : "failed",
+                  activity_history: [],
+                  payment_id: t.id,
+                  payment_method: {
+                    card_type: "Visa",
+                    cart_last_four: "4242",
+                  },
+                  description: t.description,
+                  statement_descriptor: t.description,
+                  risk_evaluation: {
+                    score: 0,
+                    level: "low",
+                  },
+                  country: "US",
+                  items: [],
+                  createdAt: new Date(t.date),
+                }));
+              }
+            }
+
+            if (failedPaymentsCard.status === 'fulfilled' && failedPaymentsCard.value.data && !Array.isArray(failedPaymentsCard.value.data)) {
+              const data = failedPaymentsCard.value.data;
+              // Overriding Failed Payments with manual data
+              
+              // Convert failed payment transactions to Transaction format
+              if (data.transactions && data.transactions.length > 0) {
+                analyticsData.failedPayments = data.transactions.map((t, index) => ({
+                  _id: t.id,
+                  amount: t.amount,
+                  currency: "USD",
+                  number: `#${index + 1}`,
+                  owner: "Customer",
+                  owner_email: "customer@example.com",
+                  fingerprint: "",
+                  expires: "",
+                  type: "card",
+                  issuer: "Visa",
+                  cvc_check: true,
+                  origin: "online",
+                  address: "",
+                  status: "failed",
+                  activity_history: [],
+                  payment_id: t.id,
+                  payment_method: {
+                    card_type: "Visa",
+                    cart_last_four: "4242",
+                  },
+                  description: t.description,
+                  statement_descriptor: t.description,
+                  decline_reason: t.reason,
+                  risk_evaluation: {
+                    score: 0,
+                    level: "low",
+                  },
+                  country: "US",
+                  items: [],
+                  createdAt: new Date(t.date),
+                }));
+              }
+            }
+
+            if (newCustomersCard.status === 'fulfilled' && newCustomersCard.value.data && !Array.isArray(newCustomersCard.value.data)) {
+              const data = newCustomersCard.value.data;
+              // Overriding New Customers with manual data
+              analyticsData.newCustomers = {
+                ...analyticsData.newCustomers,
+                current: data.count,
+                change: data.change,
+                changePercent: data.changePercent,
+              };
+            }
+
+            if (topCustomersCard.status === 'fulfilled' && topCustomersCard.value.data && !Array.isArray(topCustomersCard.value.data)) {
+              const data = topCustomersCard.value.data;
+              // Overriding Top Customers with manual data
+              
+              // Convert top customers to analytics format
+              if (data.customers && data.customers.length > 0) {
+                analyticsData.topCustomersBySpend = data.customers.map(c => ({
+                  customer_id: c.customerId,
+                  owner_email: c.email,
+                  owner: c.name,
+                  totalSpend: c.totalSpend,
+                  transactionCount: c.transactionCount,
+                }));
+              }
+            }
+          } catch (cardErr) {
+            // Error fetching card data, using analytics data
+          }
+        } else {
+          // Multi-day range - fetch data for all days in range
+          // Fetching manual card data for date range
+          
+          try {
+            // Fetch data for the entire range
+            const [grossVolumeRange, netVolumeRange, paymentsRange, failedPaymentsRange, topCustomersRange] = await Promise.allSettled([
+              grossVolumeCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+              netVolumeCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+              paymentsCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+              failedPaymentsCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+              topCustomersCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+            ]);
+
+            // Process Gross Volume range data
+            if (grossVolumeRange.status === 'fulfilled' && grossVolumeRange.value.data) {
+              const dataArray = Array.isArray(grossVolumeRange.value.data) ? grossVolumeRange.value.data : [];
+              // Gross Volume range data processed
+              
+              // Create a map of existing data by date
+              const dataMap = new Map();
+              dataArray.forEach(dayData => {
+                const dateKey = new Date(dayData.date).toISOString().split('T')[0];
+                dataMap.set(dateKey, dayData.value);
+              });
+              
+              // Build complete daily timeSeries for ALL days in range (fill missing with 0)
+              const dailyTimeSeries = [];
+              const currentDate = new Date(overviewDateRange.start);
+              const endDate = new Date(overviewDateRange.end);
+              
+              while (currentDate <= endDate) {
+                const dateKey = currentDate.toISOString().split('T')[0];
+                const value = dataMap.get(dateKey) || 0; // Use 0 for missing days
+                
+                dailyTimeSeries.push({
+                  date: new Date(currentDate).toISOString(),
+                  value: value,
+                });
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+              
+              // Calculate total for the range (only from actual data)
+              const totalValue = dataArray.reduce((sum, d) => sum + d.value, 0);
+              
+              // Gross Volume complete timeSeries created
+              
+              analyticsData.grossVolume = {
+                ...analyticsData.grossVolume,
+                current: totalValue,
+                timeSeries: {
+                  ...analyticsData.grossVolume.timeSeries,
+                  current: dailyTimeSeries,
+                },
+              };
+            }
+
+            // Process Net Volume range data
+            if (netVolumeRange.status === 'fulfilled' && netVolumeRange.value.data) {
+              const dataArray = Array.isArray(netVolumeRange.value.data) ? netVolumeRange.value.data : [];
+              // Net Volume range data processed
+              
+              // Create a map of existing data by date
+              const dataMap = new Map();
+              dataArray.forEach(dayData => {
+                const dateKey = new Date(dayData.date).toISOString().split('T')[0];
+                dataMap.set(dateKey, dayData.value);
+              });
+              
+              // Build complete daily timeSeries for ALL days in range (fill missing with 0)
+              const dailyTimeSeries = [];
+              const currentDate = new Date(overviewDateRange.start);
+              const endDate = new Date(overviewDateRange.end);
+              
+              while (currentDate <= endDate) {
+                const dateKey = currentDate.toISOString().split('T')[0];
+                const value = dataMap.get(dateKey) || 0; // Use 0 for missing days
+                
+                dailyTimeSeries.push({
+                  date: new Date(currentDate).toISOString(),
+                  value: value,
+                });
+                
+                currentDate.setDate(currentDate.getDate() + 1);
+              }
+              
+              // Calculate total for the range (only from actual data)
+              const totalValue = dataArray.reduce((sum, d) => sum + d.value, 0);
+              
+              // Net Volume complete timeSeries created
+              
+              analyticsData.netVolume = {
+                ...analyticsData.netVolume,
+                current: totalValue,
+                timeSeries: {
+                  ...analyticsData.netVolume.timeSeries,
+                  current: dailyTimeSeries,
+                },
+              };
+            }
+
+            // Process Payments range data - aggregate all transactions from all days
+            console.log("DEBUG - paymentsRange:", paymentsRange);
+            if (paymentsRange.status === 'fulfilled' && paymentsRange.value.data && Array.isArray(paymentsRange.value.data)) {
+              const dataArray = paymentsRange.value.data;
+              console.log("DEBUG - Payments dataArray:", dataArray);
+              console.log("DEBUG - First item transactions:", dataArray[0]?.transactions);
+              
+              // Aggregate all transactions from all days
+              const allTransactions: any[] = [];
+              dataArray.forEach(dayData => {
+                console.log("DEBUG - dayData.transactions:", dayData.transactions);
+                if (dayData.transactions && dayData.transactions.length > 0) {
+                  console.log("DEBUG - Found", dayData.transactions.length, "transactions");
+                  dayData.transactions.forEach(t => {
+                    allTransactions.push({
+                      _id: t.id,
+                      amount: t.amount,
+                      currency: "USD",
+                      number: `#${allTransactions.length + 1}`,
+                      owner: "Customer",
+                      owner_email: "customer@example.com",
+                      fingerprint: "",
+                      expires: "",
+                      type: "card",
+                      issuer: "Visa",
+                      cvc_check: true,
+                      origin: "online",
+                      address: "",
+                      status: t.status === "successful" ? "succeeded" : "failed",
+                      activity_history: [],
+                      payment_id: t.id,
+                      payment_method: {
+                        card_type: "Visa",
+                        cart_last_four: "4242",
+                      },
+                      description: t.description,
+                      statement_descriptor: t.description,
+                      risk_evaluation: {
+                        score: 0,
+                        level: "low",
+                      },
+                      country: "US",
+                      items: [],
+                      createdAt: new Date(t.date),
+                    });
+                  });
+                }
+              });
+              
+              console.log("DEBUG - Total allTransactions:", allTransactions.length);
+              if (allTransactions.length > 0) {
+                // Total payment transactions aggregated
+                analyticsData.payments = allTransactions;
+                console.log("DEBUG - Set analyticsData.payments to:", allTransactions);
+              }
+            }
+
+            // Process Failed Payments range data - aggregate all transactions from all days
+            if (failedPaymentsRange.status === 'fulfilled' && failedPaymentsRange.value.data && Array.isArray(failedPaymentsRange.value.data)) {
+              const dataArray = failedPaymentsRange.value.data;
+              
+              // Aggregate all failed transactions from all days
+              const allFailedTransactions: any[] = [];
+              dataArray.forEach(dayData => {
+                if (dayData.transactions && dayData.transactions.length > 0) {
+                  dayData.transactions.forEach(t => {
+                    allFailedTransactions.push({
+                      _id: t.id,
+                      amount: t.amount,
+                      currency: "USD",
+                      number: `#${allFailedTransactions.length + 1}`,
+                      owner: "Customer",
+                      owner_email: "customer@example.com",
+                      fingerprint: "",
+                      expires: "",
+                      type: "card",
+                      issuer: "Visa",
+                      cvc_check: true,
+                      origin: "online",
+                      address: "",
+                      status: "failed",
+                      activity_history: [],
+                      payment_id: t.id,
+                      payment_method: {
+                        card_type: "Visa",
+                        cart_last_four: "4242",
+                      },
+                      description: t.description,
+                      statement_descriptor: t.description,
+                      decline_reason: t.reason,
+                      risk_evaluation: {
+                        score: 0,
+                        level: "low",
+                      },
+                      country: "US",
+                      items: [],
+                      createdAt: new Date(t.date),
+                    });
+                  });
+                }
+              });
+              
+              if (allFailedTransactions.length > 0) {
+                // Total failed payment transactions aggregated
+                analyticsData.failedPayments = allFailedTransactions;
+              }
+            }
+
+            // Process Top Customers range data - aggregate and rank by total spend
+            if (topCustomersRange.status === 'fulfilled' && topCustomersRange.value.data && Array.isArray(topCustomersRange.value.data)) {
+              const dataArray = topCustomersRange.value.data;
+              
+              // Aggregate customers across all days by customer_id/email
+              const customerMap = new Map();
+              dataArray.forEach(dayData => {
+                if (dayData.customers && dayData.customers.length > 0) {
+                  dayData.customers.forEach(c => {
+                    const key = c.customerId || c.email || c.name;
+                    if (customerMap.has(key)) {
+                      const existing = customerMap.get(key);
+                      existing.totalSpend += c.totalSpend;
+                      existing.transactionCount += c.transactionCount;
+                    } else {
+                      customerMap.set(key, {
+                        customer_id: c.customerId,
+                        owner_email: c.email,
+                        owner: c.name,
+                        totalSpend: c.totalSpend,
+                        transactionCount: c.transactionCount,
+                      });
+                    }
+                  });
+                }
+              });
+              
+              if (customerMap.size > 0) {
+                // Convert to array and sort by totalSpend descending
+                const aggregatedCustomers = Array.from(customerMap.values())
+                  .sort((a, b) => b.totalSpend - a.totalSpend);
+                
+                // Total unique customers aggregated
+                analyticsData.topCustomersBySpend = aggregatedCustomers;
+              }
+            }
+          } catch (rangeErr) {
+            // Error fetching range data, using analytics data
+          }
+        }
+
+        // Analytics data prepared
+        console.log("DEBUG - Final analyticsData.payments:", analyticsData.payments.length, analyticsData.payments);
+
+        setOverviewAnalytics(analyticsData);
       } catch (err) {
         setOverviewError(err instanceof Error ? err.message : "Failed to fetch analytics");
         console.error("Error fetching overview analytics:", err);

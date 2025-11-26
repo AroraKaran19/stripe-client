@@ -14,6 +14,7 @@ const predefinedRanges = [
   { value: "today", label: "Today" },
   { value: "last_7_days", label: "Last 7 days" },
   { value: "last_4_weeks", label: "Last 4 weeks" },
+  { value: "last_6_months", label: "Last 6 months" },
   { value: "month_to_date", label: "Month to date" },
   { value: "quarter_to_date", label: "Quarter to date" },
   { value: "all_time", label: "All time" },
@@ -31,21 +32,30 @@ const DateRangePicker = ({
     currentRange?.start || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
   );
   const [endDate, setEndDate] = useState<Date>(currentRange?.end || new Date());
-  const [leftMonth, setLeftMonth] = useState(new Date());
-  const [rightMonth, setRightMonth] = useState(new Date()); // Always start with current month
+
+  // Left month is always previous month, right month is always current month
+  const getRightMonth = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  };
+
+  const getLeftMonth = () => {
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return prevMonth;
+  };
+
+  const [leftMonth, setLeftMonth] = useState(getLeftMonth());
+  const [rightMonth, setRightMonth] = useState(getRightMonth());
 
   useEffect(() => {
+    // Always set left to previous month and right to current month
+    setLeftMonth(getLeftMonth());
+    setRightMonth(getRightMonth());
+
     if (currentRange) {
       setStartDate(currentRange.start);
       setEndDate(currentRange.end);
-      setLeftMonth(new Date(currentRange.start));
-      // Right month shows current month if end date is in current month, otherwise show end date's month
-      const now = new Date();
-      const end = new Date(currentRange.end);
-      const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-      const nowMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      // If end date is in current month, show current month, otherwise show end date's month
-      setRightMonth(endMonth.getTime() === nowMonth.getTime() ? now : end);
       
       // Check if current range matches a predefined range
       const predefinedMatch = predefinedRanges.find(
@@ -99,7 +109,7 @@ const DateRangePicker = ({
 
     switch (value) {
       case "today":
-        start = today;
+        start = new Date(today);
         break;
       case "last_7_days":
         start = new Date(today);
@@ -108,6 +118,10 @@ const DateRangePicker = ({
       case "last_4_weeks":
         start = new Date(today);
         start.setDate(start.getDate() - 27); // Last 4 weeks includes today
+        break;
+      case "last_6_months":
+        start = new Date(today);
+        start.setMonth(start.getMonth() - 6);
         break;
       case "month_to_date":
         start = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -125,12 +139,9 @@ const DateRangePicker = ({
 
     setStartDate(start);
     setEndDate(end);
-    // Set months based on the range
-    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
-    const nowMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    setLeftMonth(new Date(start));
-    // Right month shows current month if end date is in current month, otherwise show end date's month
-    setRightMonth(endMonth.getTime() === nowMonth.getTime() ? now : end);
+    // Always set left to previous month and right to current month
+    setLeftMonth(getLeftMonth());
+    setRightMonth(getRightMonth());
 
     // Emit preview so the parent can show the chosen label before apply
     if (onPreview) {
@@ -145,27 +156,40 @@ const DateRangePicker = ({
     if (date.getTime() > today.getTime()) {
       return;
     }
-    if (!startDate || (startDate && endDate && startDate.getTime() !== endDate.getTime())) {
-      // Starting new selection
+
+    // First click: set as start date
+    if (!startDate) {
       setStartDate(date);
       setEndDate(date);
       setSelectedRange(null);
-    } else if (startDate && !endDate) {
-      // Selecting end date
-      if (date < startDate) {
-        setEndDate(startDate);
+      if (onPreview) {
+        onPreview({ start: date, end: date, label: `${formatDateInput(date)} - ${formatDateInput(date)}` });
+      }
+      return;
+    }
+
+    // Second click: set as end date
+    if (startDate && startDate.getTime() === endDate.getTime()) {
+      // If second click is before start date, swap them
+      if (date.getTime() < startDate.getTime()) {
         setStartDate(date);
+        setEndDate(startDate);
       } else {
         setEndDate(date);
       }
       setSelectedRange(null);
-    } else {
-      // Reset selection
-      setStartDate(date);
-      setEndDate(date);
-      setSelectedRange(null);
+      if (onPreview) {
+        const newStart = date.getTime() < startDate.getTime() ? date : startDate;
+        const newEnd = date.getTime() < startDate.getTime() ? startDate : date;
+        onPreview({ start: newStart, end: newEnd, label: `${formatDateInput(newStart)} - ${formatDateInput(newEnd)}` });
+      }
+      return;
     }
 
+    // Third click or more: reset and start new selection
+    setStartDate(date);
+    setEndDate(date);
+    setSelectedRange(null);
     if (onPreview) {
       onPreview({ start: date, end: date, label: `${formatDateInput(date)} - ${formatDateInput(date)}` });
     }
@@ -234,39 +258,31 @@ const DateRangePicker = ({
   const navigateMonth = (direction: "prev" | "next", isLeftCalendar: boolean) => {
     const now = new Date();
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
     if (isLeftCalendar) {
       const newMonth = new Date(leftMonth);
       newMonth.setMonth(newMonth.getMonth() + (direction === "next" ? 1 : -1));
-      // Prevent moving beyond current month
-      const candidate = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
-      if (candidate.getTime() > currentMonth.getTime()) {
-        setLeftMonth(currentMonth);
-      } else {
-      setLeftMonth(newMonth);
-      }
-      // If right month becomes the same as left, advance right by one month
-      if (newMonth.getMonth() === rightMonth.getMonth() && 
-          newMonth.getFullYear() === rightMonth.getFullYear()) {
-        const right = new Date(newMonth);
-        right.setMonth(right.getMonth() + 1);
-        setRightMonth(right);
+      
+      // Left month can go back but cannot go beyond or equal to right month
+      const newRight = new Date(newMonth);
+      newRight.setMonth(newRight.getMonth() + 1);
+      
+      // Only allow if new right month doesn't exceed current month
+      if (newRight.getTime() <= currentMonth.getTime()) {
+        setLeftMonth(newMonth);
+        setRightMonth(newRight);
       }
     } else {
       const newMonth = new Date(rightMonth);
       newMonth.setMonth(newMonth.getMonth() + (direction === "next" ? 1 : -1));
-      // Prevent moving beyond current month
-      const candidate = new Date(newMonth.getFullYear(), newMonth.getMonth(), 1);
-      if (candidate.getTime() > currentMonth.getTime()) {
-        setRightMonth(currentMonth);
-      } else {
+      
+      // Right month cannot exceed current month
+      if (newMonth.getTime() <= currentMonth.getTime()) {
         setRightMonth(newMonth);
-      }
-      // If left month becomes the same as right, move left back by one month
-      if (newMonth.getMonth() === leftMonth.getMonth() && 
-          newMonth.getFullYear() === leftMonth.getFullYear()) {
-        const left = new Date(newMonth);
-        left.setMonth(left.getMonth() - 1);
-        setLeftMonth(left);
+        // Left month is always one month before right
+        const newLeft = new Date(newMonth);
+        newLeft.setMonth(newLeft.getMonth() - 1);
+        setLeftMonth(newLeft);
       }
     }
   };
@@ -326,11 +342,9 @@ const DateRangePicker = ({
           {/* Right Panel - Calendar */}
           <div className="flex-1 p-4">
             {/* Date Inputs */}
-            <div className="flex gap-3 mb-3">
-              <div className="flex-1">
-                <label className="block text-xs font-semibold text-[#353a44] mb-1">
-                  Start
-                </label>
+            <div className="flex gap-6 mb-6 items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#353a44]">Start</span>
                 <input
                   type="text"
                   value={formatDateInput(startDate)}
@@ -345,14 +359,12 @@ const DateRangePicker = ({
                       onPreview({ start: startDate, end: endDate, label: `${formatDateInput(startDate)} - ${formatDateInput(endDate)}` });
                     }
                   }}
-                  className="w-full px-2 py-1.5 text-xs border border-[#533afd] rounded-md focus:outline-none focus:ring-1 focus:ring-[#533afd]"
+                  className="px-3 py-1.5 text-xs border border-[#533afd] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd] focus:ring-offset-1 w-32 text-center font-semibold"
                   placeholder="DD / MM / YYYY"
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-xs font-semibold text-[#353a44] mb-1">
-                  End
-                </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-[#353a44]">End</span>
                 <input
                   type="text"
                   value={formatDateInput(endDate)}
@@ -367,24 +379,24 @@ const DateRangePicker = ({
                       onPreview({ start: startDate, end: endDate, label: `${formatDateInput(startDate)} - ${formatDateInput(endDate)}` });
                     }
                   }}
-                  className="w-full px-2 py-1.5 text-xs border border-[#533afd] rounded-md focus:outline-none focus:ring-1 focus:ring-[#533afd]"
+                  className="px-3 py-1.5 text-xs border border-[#533afd] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd] focus:ring-offset-1 w-32 text-center font-semibold"
                   placeholder="DD / MM / YYYY"
                 />
               </div>
             </div>
 
             {/* Calendars */}
-            <div className="flex gap-4">
+            <div className="flex gap-8">
               {/* Left Calendar */}
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-4">
                   <button
                     onClick={() => navigateMonth("prev", true)}
-                    className="p-1 hover:bg-gray-100 rounded-md"
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
                   >
-                    <ChevronLeft className="size-3" />
+                    <ChevronLeft className="size-4 text-[#353a44]" />
                   </button>
-                  <h3 className="text-xs font-semibold text-[#353a44]">
+                  <h3 className="text-sm font-semibold text-[#353a44]">
                     {leftMonth.toLocaleDateString("en-US", {
                       month: "long",
                       year: "numeric",
@@ -392,22 +404,22 @@ const DateRangePicker = ({
                   </h3>
                   <button
                     onClick={() => navigateMonth("next", true)}
-                    className="p-1 hover:bg-gray-100 rounded-md"
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
                   >
-                    <ChevronRight className="size-3" />
+                    <ChevronRight className="size-4 text-[#353a44]" />
                   </button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div className="grid grid-cols-7 gap-2 mb-3">
                   {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((day) => (
                     <div
                       key={day}
-                      className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500"
+                      className="w-8 h-8 flex items-center justify-center text-xs font-semibold text-gray-600"
                     >
                       {day}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-2">
                   {renderCalendar(leftMonth, true)}
                 </div>
               </div>
@@ -417,9 +429,9 @@ const DateRangePicker = ({
                 <div className="flex items-center justify-between mb-4">
                   <button
                     onClick={() => navigateMonth("prev", false)}
-                    className="p-1 hover:bg-gray-100 rounded-md"
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
                   >
-                    <ChevronLeft className="size-4" />
+                    <ChevronLeft className="size-4 text-[#353a44]" />
                   </button>
                   <h3 className="text-sm font-semibold text-[#353a44]">
                     {rightMonth.toLocaleDateString("en-US", {
@@ -429,38 +441,38 @@ const DateRangePicker = ({
                   </h3>
                   <button
                     onClick={() => navigateMonth("next", false)}
-                    className="p-1 hover:bg-gray-100 rounded-md"
+                    className="p-1 hover:bg-gray-100 rounded-md transition-colors"
                   >
-                    <ChevronRight className="size-4" />
+                    <ChevronRight className="size-4 text-[#353a44]" />
                   </button>
                 </div>
-                <div className="grid grid-cols-7 gap-1 mb-2">
+                <div className="grid grid-cols-7 gap-2 mb-3">
                   {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map((day) => (
                     <div
                       key={day}
-                      className="w-8 h-8 flex items-center justify-center text-xs font-medium text-gray-500"
+                      className="w-8 h-8 flex items-center justify-center text-xs font-semibold text-gray-600"
                     >
                       {day}
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid grid-cols-7 gap-2">
                   {renderCalendar(rightMonth, false)}
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-2 mt-4">
+            <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={handleClear}
-                className="px-3 py-1.5 text-xs font-semibold text-[#353a44] bg-white border border-[#e5e7eb] rounded-md hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-[#353a44] bg-white border border-[#e5e7eb] rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Clear
               </button>
               <button
                 onClick={(e) => handleApply(e)}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-[#533afd] rounded-md hover:bg-[#4328e8] transition-colors"
+                className="px-4 py-2 text-xs font-semibold text-white bg-[#533afd] rounded-lg hover:bg-[#4328e8] transition-colors"
               >
                 Apply
               </button>

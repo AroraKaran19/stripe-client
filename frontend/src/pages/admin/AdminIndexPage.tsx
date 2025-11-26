@@ -5,8 +5,8 @@ const AdminIndexPage = () => {
 
   const cards = [
     {
-      title: "Admin Home",
-      description: "Overview and admin dashboard",
+      title: "Manage Home Page",
+      description: "Edit home page card sections data",
       onClick: () => navigate("/admin/home"),
     },
     {
@@ -36,6 +36,7 @@ const AdminIndexPage = () => {
 };
 
 export default AdminIndexPage;
+
 
 
 

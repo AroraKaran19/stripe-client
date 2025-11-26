@@ -46,16 +46,17 @@ const AnalyticsLineChart = ({
       // Check if it's hourly format (contains time component)
       if (dateString.includes("T") && dateString.includes(":00:00")) {
         // Hourly format: "26 Oct, 00:00" (date + time in 24-hour format)
-        const day = date.getDate();
-        const month = date.toLocaleDateString("en-US", { month: "short" });
-        const hours = String(date.getHours()).padStart(2, "0");
-        const minutes = String(date.getMinutes()).padStart(2, "0");
+        // Use UTC methods to avoid timezone shifts
+        const day = date.getUTCDate();
+        const month = date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+        const hours = String(date.getUTCHours()).padStart(2, "0");
+        const minutes = String(date.getUTCMinutes()).padStart(2, "0");
         return `${day} ${month}, ${hours}:${minutes}`;
       }
       
       // Daily format: "26 Oct" or "1 Nov"
-      const day = date.getDate();
-      const month = date.toLocaleDateString("en-US", { month: "short" });
+      const day = date.getUTCDate();
+      const month = date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
       return `${day} ${month}`;
     } catch {
       return dateString;

@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { Transaction } from "../models/transaction.model";
-import { AnalyticsSnapshot } from "../models/analytics-snapshot.model";
 import { getUTCStartOfDay } from "../utils/dateUtils";
 
 // Load environment variables
@@ -187,127 +186,6 @@ const generateTransactionsForAnalytics = () => {
   return transactions;
 };
 
-// Generate analytics snapshots with hourly breakdowns
-const generateAnalyticsSnapshots = () => {
-  const now = new Date();
-  const snapshots: any[] = [];
-  
-  const metrics = [
-    "gross_volume",
-    "net_volume",
-    "new_customers",
-    "successful_payments",
-    "failed_payments",
-    "conversion_rate",
-    "average_order_value",
-  ];
-
-  // Generate snapshots for last 7 days
-  for (let day = 0; day < 7; day++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - day);
-    const normalizedDate = getUTCStartOfDay(date); // Normalize to UTC
-    
-    // Generate hourly breakdown for each metric
-    for (const metric of metrics) {
-      let dailyValue = 0;
-      const hourlyBreakdown: { [hour: number]: number } = {};
-      
-      // Generate realistic hourly data based on metric type
-      if (metric === "gross_volume" || metric === "net_volume") {
-        // For volume metrics: random daily total between $1000-$5000
-        dailyValue = Math.floor(Math.random() * 4000) + 1000;
-        
-        // Distribute across 24 hours with some variation
-        // Some hours have more activity (business hours), some less (night)
-        for (let hour = 0; hour < 24; hour++) {
-          // Business hours (9-17) have higher activity
-          const isBusinessHour = hour >= 9 && hour <= 17;
-          const baseHourlyValue = dailyValue / 24;
-          
-          // Add variation: business hours get 1.5x-2x, night hours get 0.3x-0.7x
-          const multiplier = isBusinessHour 
-            ? 1.5 + Math.random() * 0.5  // 1.5x to 2x
-            : 0.3 + Math.random() * 0.4;  // 0.3x to 0.7x
-          
-          hourlyBreakdown[hour] = Math.round(baseHourlyValue * multiplier * 100) / 100;
-        }
-        
-        // Adjust total to match daily value (normalize)
-        const totalHourly = Object.values(hourlyBreakdown).reduce((sum, v) => sum + v, 0);
-        const adjustment = dailyValue / totalHourly;
-        for (let hour = 0; hour < 24; hour++) {
-          hourlyBreakdown[hour] = Math.round(hourlyBreakdown[hour] * adjustment * 100) / 100;
-        }
-        
-      } else if (metric === "new_customers" || metric === "successful_payments" || metric === "failed_payments") {
-        // For count metrics: random daily total between 5-50
-        dailyValue = Math.floor(Math.random() * 45) + 5;
-        
-        // Distribute across hours (some hours get more, some get 0)
-        const hoursWithActivity = Math.floor(Math.random() * 12) + 8; // 8-20 hours have activity
-        const activeHours: number[] = [];
-        
-        // Select random hours for activity
-        while (activeHours.length < hoursWithActivity) {
-          const hour = Math.floor(Math.random() * 24);
-          if (!activeHours.includes(hour)) {
-            activeHours.push(hour);
-          }
-        }
-        
-        // Distribute value across active hours
-        const valuePerHour = dailyValue / hoursWithActivity;
-        for (let hour = 0; hour < 24; hour++) {
-          if (activeHours.includes(hour)) {
-            // Add some variation
-            const variation = 0.5 + Math.random(); // 0.5x to 1.5x
-            hourlyBreakdown[hour] = Math.round(valuePerHour * variation);
-          } else {
-            hourlyBreakdown[hour] = 0;
-          }
-        }
-        
-        // Normalize to match daily total
-        const totalHourly = Object.values(hourlyBreakdown).reduce((sum, v) => sum + v, 0);
-        const adjustment = dailyValue / totalHourly;
-        for (let hour = 0; hour < 24; hour++) {
-          hourlyBreakdown[hour] = Math.round(hourlyBreakdown[hour] * adjustment);
-        }
-        
-      } else if (metric === "conversion_rate") {
-        // Conversion rate: percentage between 2-8%
-        dailyValue = Math.round((2 + Math.random() * 6) * 100) / 100;
-        
-        // Same percentage for all hours (conversion rate doesn't vary much hourly)
-        for (let hour = 0; hour < 24; hour++) {
-          hourlyBreakdown[hour] = dailyValue;
-        }
-        
-      } else if (metric === "average_order_value") {
-        // Average order value: between $50-$200
-        dailyValue = Math.round((50 + Math.random() * 150) * 100) / 100;
-        
-        // Similar value for all hours
-        for (let hour = 0; hour < 24; hour++) {
-          hourlyBreakdown[hour] = dailyValue;
-        }
-      }
-      
-      snapshots.push({
-        date: normalizedDate,
-        metric,
-        value: dailyValue,
-        source: "manual", // Mark as manual for seed data
-        hourlyBreakdown,
-        notes: `Seed data for ${metric} on ${normalizedDate.toISOString().split("T")[0]}`,
-        updatedBy: "seed-script",
-      });
-    }
-  }
-
-  return snapshots;
-};
 
 const seedAnalytics = async () => {
   try {
@@ -358,76 +236,12 @@ const seedAnalytics = async () => {
       console.log(`   ${status}: ${count}`);
     });
 
-    // Seed Analytics Snapshots
-    console.log("\n\n📊 Generating analytics snapshots with hourly breakdowns...");
-    const testSnapshots = generateAnalyticsSnapshots();
-    
-    console.log(`📈 Generated ${testSnapshots.length} analytics snapshots`);
-    console.log("   - Last 7 days of data");
-    console.log("   - All 7 metrics: gross_volume, net_volume, new_customers, etc.");
-    console.log("   - Complete 24-hour hourly breakdowns for each day");
-
-    console.log("\n📝 Creating analytics snapshots in database...");
-    
-    // Clear existing snapshots (optional - comment out if you want to keep existing data)
-    // await AnalyticsSnapshot.deleteMany({});
-    // console.log("🗑️  Cleared existing snapshots");
-    
-    // Use upsert to avoid duplicates (based on unique index: date + metric)
-    let snapshotsProcessed = 0;
-    let snapshotsSkipped = 0;
-    
-    for (const snapshot of testSnapshots) {
-      try {
-        // Check if snapshot already exists
-        const existing = await AnalyticsSnapshot.findOne({
-          date: snapshot.date,
-          metric: snapshot.metric,
-        });
-        
-        if (existing) {
-          // Update existing snapshot
-          await AnalyticsSnapshot.findOneAndUpdate(
-            { date: snapshot.date, metric: snapshot.metric },
-            snapshot,
-            { new: true }
-          );
-          snapshotsProcessed++;
-        } else {
-          // Create new snapshot
-          await AnalyticsSnapshot.create(snapshot);
-          snapshotsProcessed++;
-        }
-      } catch (error: any) {
-        console.warn(`⚠️  Failed to upsert snapshot for ${snapshot.metric} on ${snapshot.date.toISOString().split("T")[0]}: ${error.message}`);
-        snapshotsSkipped++;
-      }
-    }
-    
-    console.log(`\n✅ Successfully processed ${snapshotsProcessed} analytics snapshots!`);
-    if (snapshotsSkipped > 0) {
-      console.log(`   ⚠️  Skipped: ${snapshotsSkipped} snapshots (due to errors)`);
-    }
-    
-    // Show summary by metric
-    const metricCounts: Record<string, number> = {};
-    testSnapshots.forEach((snapshot) => {
-      const metric = snapshot.metric;
-      metricCounts[metric] = (metricCounts[metric] || 0) + 1;
-    });
-
-    console.log("\n📊 Snapshot Summary by Metric:");
-    Object.entries(metricCounts).forEach(([metric, count]) => {
-      console.log(`   ${metric}: ${count} days`);
-    });
-
     console.log("\n🎉 Analytics seed completed successfully!");
     console.log("\n💡 Your analytics dashboard should now show:");
     console.log("   - Transactions data from database");
-    console.log("   - Analytics snapshots with hourly breakdowns");
     console.log("   - Try 'Last 7 days' with 'Daily' or 'Hourly' frequency");
     console.log("   - Compare with 'Previous period' to see comparison data");
-    console.log("   - Edit snapshots in Admin page to see manual overrides");
+    console.log("   - Use Admin pages to manage individual card data");
   } catch (error: any) {
     console.error("❌ Error seeding analytics:", error.message);
     if (error.name === 'BulkWriteError' && error.writeErrors) {
