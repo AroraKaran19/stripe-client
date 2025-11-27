@@ -3,10 +3,19 @@ import { NetVolumeCard, type INetVolumeCard } from "../models/net-volume-card.mo
 export const getNetVolumeCardByDate = async (
   date: Date
 ): Promise<INetVolumeCard | null> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  // Create UTC start and end of day
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
+  const endOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    23, 59, 59, 999
+  ));
 
   return NetVolumeCard.findOne({
     date: {
@@ -32,30 +41,45 @@ export const createOrUpdateNetVolumeCard = async (
   date: Date,
   data: Partial<INetVolumeCard>
 ): Promise<INetVolumeCard> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Create UTC start of day for the given date
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
-  const existing = await NetVolumeCard.findOne({
-    date: {
-      $gte: startOfDay,
-      $lte: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+  const result = await NetVolumeCard.findOneAndUpdate(
+    {
+      date: {
+        $gte: startOfDay,
+        $lte: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+      },
     },
-  });
+    {
+      $set: {
+        date: startOfDay,
+        ...data,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    }
+  );
 
-  if (existing) {
-    Object.assign(existing, data);
-    return existing.save();
-  }
-
-  return NetVolumeCard.create({
-    date: startOfDay,
-    ...data,
-  });
+  return result!;
 };
 
 export const deleteNetVolumeCard = async (date: Date): Promise<void> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Create UTC start of day
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
   await NetVolumeCard.deleteOne({
     date: {

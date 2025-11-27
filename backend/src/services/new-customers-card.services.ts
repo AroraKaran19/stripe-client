@@ -3,10 +3,18 @@ import { NewCustomersCard, type INewCustomersCard } from "../models/new-customer
 export const getNewCustomersCardByDate = async (
   date: Date
 ): Promise<INewCustomersCard | null> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
+  const endOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    23, 59, 59, 999
+  ));
 
   return NewCustomersCard.findOne({
     date: {
@@ -32,8 +40,12 @@ export const createOrUpdateNewCustomersCard = async (
   date: Date,
   data: Partial<INewCustomersCard>
 ): Promise<INewCustomersCard> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
   const existing = await NewCustomersCard.findOne({
     date: {
@@ -54,8 +66,12 @@ export const createOrUpdateNewCustomersCard = async (
 };
 
 export const deleteNewCustomersCard = async (date: Date): Promise<void> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
   await NewCustomersCard.deleteOne({
     date: {

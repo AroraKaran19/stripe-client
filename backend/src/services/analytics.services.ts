@@ -45,6 +45,16 @@ interface AnalyticsResponse {
       previous: TimeSeriesPoint[];
     };
   };
+  successfulPayments: {
+    current: number;
+    previous: number;
+    change: number;
+    changePercent: number;
+    timeSeries: {
+      current: TimeSeriesPoint[];
+      previous: TimeSeriesPoint[];
+    };
+  };
   topCustomersBySpend: Array<{
     customer_id?: string;
     owner_email?: string;
@@ -205,9 +215,11 @@ const formatLocalDate = (d: Date): string => {
 };
 
 const formatLocalHourKey = (d: Date): string => {
-  const base = formatLocalDate(d);
-  const h = String(d.getUTCHours()).padStart(2, "0");
-  return `${base}T${h}:00:00`;
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const hour = String(d.getUTCHours()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:00:00.000Z`;
 };
 
 const generateTimeSeries = (
@@ -220,37 +232,46 @@ const generateTimeSeries = (
   const end = new Date(dateRange.end);
 
   if (frequency === "hourly") {
-    // For hourly, only show data for one day (the end date)
-    const singleDayStart = new Date(end);
-    singleDayStart.setUTCHours(0, 0, 0, 0);
-    const singleDayEnd = new Date(end);
-    singleDayEnd.setUTCHours(23, 59, 59, 999);
-    
-    // Group by hour for the selected day only
+    // For hourly, generate hourly data for all days in the range
     const hourlyMap = new Map<string, number>();
+    
+    // Process transactions and group by hour
     transactions.forEach((tx) => {
       if (tx.admin_date) {
-        const date = new Date(tx.admin_date);
-        // Only include transactions from the selected day
-        if (date >= singleDayStart && date <= singleDayEnd) {
-          const hourKey = formatLocalHourKey(date);
-          hourlyMap.set(
-            hourKey,
-            (hourlyMap.get(hourKey) || 0) + (tx.amount || 0)
-          );
-        }
+        const txDate = new Date(tx.admin_date);
+        // Create hourly key: YYYY-MM-DDTHH:00:00.000Z
+        const hourKey = new Date(Date.UTC(
+          txDate.getUTCFullYear(),
+          txDate.getUTCMonth(),
+          txDate.getUTCDate(),
+          txDate.getUTCHours(),
+          0, 0, 0
+        )).toISOString();
+        hourlyMap.set(hourKey, (hourlyMap.get(hourKey) || 0) + (tx.amount || 0));
       }
     });
 
-    // Generate all 24 hours for the selected day
-    const currentDate = new Date(singleDayStart);
-    while (currentDate <= singleDayEnd) {
-      const hourKey = formatLocalHourKey(currentDate);
-      points.push({
-        date: hourKey,
-        value: hourlyMap.get(hourKey) || 0,
-      });
-      currentDate.setUTCHours(currentDate.getUTCHours() + 1);
+    // Generate hourly data points for entire date range
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      for (let hour = 0; hour < 24; hour++) {
+        const hourDate = new Date(Date.UTC(
+          currentDate.getUTCFullYear(),
+          currentDate.getUTCMonth(),
+          currentDate.getUTCDate(),
+          hour,
+          0, 0, 0
+        ));
+        
+        // Only include if within range
+        if (hourDate >= start && hourDate <= end) {
+          points.push({
+            date: hourDate.toISOString(),
+            value: hourlyMap.get(hourDate.toISOString()) || 0,
+          });
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
   } else if (frequency === "daily") {
     // Group by day
@@ -300,7 +321,7 @@ const generateTimeSeries = (
       }
       currentDate.setDate(currentDate.getDate() + 7);
     }
-  } else {
+  } else if (frequency === "monthly") {
     // Monthly
     const monthlyMap = new Map<string, number>();
     transactions.forEach((tx) => {
@@ -325,6 +346,31 @@ const generateTimeSeries = (
       }
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
+  } else if (frequency === "yearly") {
+    // Yearly
+    const yearlyMap = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const date = new Date(tx.admin_date);
+        const yearKey = `${date.getFullYear()}`;
+        yearlyMap.set(
+          yearKey,
+          (yearlyMap.get(yearKey) || 0) + (tx.amount || 0)
+        );
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const yearKey = `${currentDate.getFullYear()}`;
+      if (!points.find((p) => p.date === yearKey)) {
+        points.push({
+          date: yearKey,
+          value: yearlyMap.get(yearKey) || 0,
+        });
+      }
+      currentDate.setFullYear(currentDate.getFullYear() + 1);
+    }
   }
 
   return points.sort((a, b) => a.date.localeCompare(b.date));
@@ -347,37 +393,50 @@ const generateCustomerTimeSeries = (
   const end = new Date(dateRange.end);
 
   if (frequency === "hourly") {
-    // For hourly, only show data for one day (the end date)
-    const singleDayStart = new Date(end);
-    singleDayStart.setUTCHours(0, 0, 0, 0);
-    const singleDayEnd = new Date(end);
-    singleDayEnd.setUTCHours(23, 59, 59, 999);
-    
+    // For hourly, generate hourly data for all days in the range
     const hourlyMap = new Map<string, Set<string>>();
+    
+    // Process transactions and group customers by hour
     transactions.forEach((tx) => {
       if (tx.admin_date && (tx.customer_id || tx.owner_email)) {
-        const date = new Date(tx.admin_date);
-        // Only include transactions from the selected day
-        if (date >= singleDayStart && date <= singleDayEnd) {
-          const hourKey = formatLocalHourKey(date);
-          const customerKey = tx.customer_id || tx.owner_email || "";
-          if (!hourlyMap.has(hourKey)) {
-            hourlyMap.set(hourKey, new Set());
-          }
-          hourlyMap.get(hourKey)!.add(customerKey);
+        const txDate = new Date(tx.admin_date);
+        // Create hourly key: YYYY-MM-DDTHH:00:00.000Z
+        const hourKey = new Date(Date.UTC(
+          txDate.getUTCFullYear(),
+          txDate.getUTCMonth(),
+          txDate.getUTCDate(),
+          txDate.getUTCHours(),
+          0, 0, 0
+        )).toISOString();
+        const customerKey = tx.customer_id || tx.owner_email || "";
+        if (!hourlyMap.has(hourKey)) {
+          hourlyMap.set(hourKey, new Set());
         }
+        hourlyMap.get(hourKey)!.add(customerKey);
       }
     });
 
-    // Generate all 24 hours for the selected day
-    const currentDate = new Date(singleDayStart);
-    while (currentDate <= singleDayEnd) {
-      const hourKey = formatLocalHourKey(currentDate);
-      points.push({
-        date: hourKey,
-        value: hourlyMap.get(hourKey)?.size || 0,
-      });
-      currentDate.setUTCHours(currentDate.getUTCHours() + 1);
+    // Generate hourly data points for entire date range
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      for (let hour = 0; hour < 24; hour++) {
+        const hourDate = new Date(Date.UTC(
+          currentDate.getUTCFullYear(),
+          currentDate.getUTCMonth(),
+          currentDate.getUTCDate(),
+          hour,
+          0, 0, 0
+        ));
+        
+        // Only include if within range
+        if (hourDate >= start && hourDate <= end) {
+          points.push({
+            date: hourDate.toISOString(),
+            value: hourlyMap.get(hourDate.toISOString())?.size || 0,
+          });
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
   } else if (frequency === "daily") {
     const dailyMap = new Map<string, Set<string>>();
@@ -427,7 +486,7 @@ const generateCustomerTimeSeries = (
       }
       currentDate.setDate(currentDate.getDate() + 7);
     }
-  } else {
+  } else if (frequency === "monthly") {
     // Monthly
     const monthlyMap = new Map<string, Set<string>>();
     transactions.forEach((tx) => {
@@ -452,6 +511,172 @@ const generateCustomerTimeSeries = (
         });
       }
       currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+  } else if (frequency === "yearly") {
+    // Yearly
+    const yearlyMap = new Map<string, Set<string>>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date && (tx.customer_id || tx.owner_email)) {
+        const date = new Date(tx.admin_date);
+        const yearKey = `${date.getFullYear()}`;
+        const customerKey = tx.customer_id || tx.owner_email || "";
+        if (!yearlyMap.has(yearKey)) {
+          yearlyMap.set(yearKey, new Set());
+        }
+        yearlyMap.get(yearKey)!.add(customerKey);
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const yearKey = `${currentDate.getFullYear()}`;
+      if (!points.find((p) => p.date === yearKey)) {
+        points.push({
+          date: yearKey,
+          value: yearlyMap.get(yearKey)?.size || 0,
+        });
+      }
+      currentDate.setFullYear(currentDate.getFullYear() + 1);
+    }
+  }
+
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+};
+
+const generatePaymentCountTimeSeries = (
+  transactions: ITransaction[],
+  dateRange: DateRange,
+  frequency: string
+): TimeSeriesPoint[] => {
+  const points: TimeSeriesPoint[] = [];
+  const start = new Date(dateRange.start);
+  const end = new Date(dateRange.end);
+
+  if (frequency === "hourly") {
+    // For hourly, generate hourly data for all days in the range
+    const hourlyMap = new Map<string, number>();
+    
+    // Process transactions and count payments by hour
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const txDate = new Date(tx.admin_date);
+        // Create hourly key: YYYY-MM-DDTHH:00:00.000Z
+        const hourKey = new Date(Date.UTC(
+          txDate.getUTCFullYear(),
+          txDate.getUTCMonth(),
+          txDate.getUTCDate(),
+          txDate.getUTCHours(),
+          0, 0, 0
+        )).toISOString();
+        hourlyMap.set(hourKey, (hourlyMap.get(hourKey) || 0) + 1);
+      }
+    });
+
+    // Generate hourly data points for entire date range
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      for (let hour = 0; hour < 24; hour++) {
+        const hourDate = new Date(Date.UTC(
+          currentDate.getUTCFullYear(),
+          currentDate.getUTCMonth(),
+          currentDate.getUTCDate(),
+          hour,
+          0, 0, 0
+        ));
+        
+        // Only include if within range
+        if (hourDate >= start && hourDate <= end) {
+          points.push({
+            date: hourDate.toISOString(),
+            value: hourlyMap.get(hourDate.toISOString()) || 0,
+          });
+        }
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  } else if (frequency === "daily") {
+    const dailyMap = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const date = new Date(tx.admin_date);
+        const dateKey = formatLocalDate(date);
+        dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + 1);
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const dateKey = formatLocalDate(currentDate);
+      points.push({
+        date: dateKey,
+        value: dailyMap.get(dateKey) || 0,
+      });
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+  } else if (frequency === "weekly") {
+    const weeklyMap = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const date = new Date(tx.admin_date);
+        const weekKey = getWeekKey(date);
+        weeklyMap.set(weekKey, (weeklyMap.get(weekKey) || 0) + 1);
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const weekKey = getWeekKey(currentDate);
+      if (!points.find((p) => p.date === weekKey)) {
+        points.push({
+          date: weekKey,
+          value: weeklyMap.get(weekKey) || 0,
+        });
+      }
+      currentDate.setDate(currentDate.getDate() + 7);
+    }
+  } else if (frequency === "monthly") {
+    // Monthly
+    const monthlyMap = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const date = new Date(tx.admin_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + 1);
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}`;
+      if (!points.find((p) => p.date === monthKey)) {
+        points.push({
+          date: monthKey,
+          value: monthlyMap.get(monthKey) || 0,
+        });
+      }
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+  } else if (frequency === "yearly") {
+    // Yearly
+    const yearlyMap = new Map<string, number>();
+    transactions.forEach((tx) => {
+      if (tx.admin_date) {
+        const date = new Date(tx.admin_date);
+        const yearKey = `${date.getFullYear()}`;
+        yearlyMap.set(yearKey, (yearlyMap.get(yearKey) || 0) + 1);
+      }
+    });
+
+    const currentDate = new Date(start);
+    while (currentDate <= end) {
+      const yearKey = `${currentDate.getFullYear()}`;
+      if (!points.find((p) => p.date === yearKey)) {
+        points.push({
+          date: yearKey,
+          value: yearlyMap.get(yearKey) || 0,
+        });
+      }
+      currentDate.setFullYear(currentDate.getFullYear() + 1);
     }
   }
 
@@ -661,6 +886,31 @@ export const getAnalytics = async (
       ),
     };
 
+    // Calculate Successful Payments count
+    const currentSuccessfulPaymentsCount = currentSucceededTransactions.length;
+    const previousSuccessfulPaymentsCount = previousSucceededTransactions.length;
+    const successfulPaymentsChange = currentSuccessfulPaymentsCount - previousSuccessfulPaymentsCount;
+    const successfulPaymentsChangePercent =
+      previousSuccessfulPaymentsCount !== 0
+        ? (successfulPaymentsChange / previousSuccessfulPaymentsCount) * 100
+        : currentSuccessfulPaymentsCount !== 0
+        ? 100
+        : 0;
+
+    // Generate time series for successful payments count
+    const successfulPaymentsTimeSeries = {
+      current: generatePaymentCountTimeSeries(
+        currentSucceededTransactions,
+        ranges.current,
+        frequency
+      ),
+      previous: generatePaymentCountTimeSeries(
+        previousSucceededTransactions,
+        ranges.previous,
+        frequency
+      ),
+    };
+
     return {
       grossVolume: {
         current: currentGrossVolume,
@@ -684,6 +934,13 @@ export const getAnalytics = async (
         change: newCustomersChange,
         changePercent: newCustomersChangePercent,
         timeSeries: newCustomersTimeSeries,
+      },
+      successfulPayments: {
+        current: currentSuccessfulPaymentsCount,
+        previous: previousSuccessfulPaymentsCount,
+        change: successfulPaymentsChange,
+        changePercent: successfulPaymentsChangePercent,
+        timeSeries: successfulPaymentsTimeSeries,
       },
       topCustomersBySpend,
       updatedAt: new Date(),

@@ -29,8 +29,6 @@ export interface AnalyticsData {
       previous: TimeSeriesPoint[];
     };
   };
-  payments: Transaction[];
-  failedPayments: Transaction[];
   newCustomers: {
     current: number;
     previous: number;
@@ -41,6 +39,18 @@ export interface AnalyticsData {
       previous: TimeSeriesPoint[];
     };
   };
+  successfulPayments: {
+    current: number;
+    previous: number;
+    change: number;
+    changePercent: number;
+    timeSeries: {
+      current: TimeSeriesPoint[];
+      previous: TimeSeriesPoint[];
+    };
+  };
+  payments: Transaction[];
+  failedPayments: Transaction[];
   topCustomersBySpend: Array<{
     customer_id?: string;
     owner_email?: string;

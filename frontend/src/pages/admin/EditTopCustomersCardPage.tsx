@@ -6,7 +6,9 @@ import { X, Plus } from "lucide-react";
 
 const EditTopCustomersCardPage = () => {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -17,6 +19,14 @@ const EditTopCustomersCardPage = () => {
     updatedBy: "Admin",
   });
 
+  // Helper to format date as YYYY-MM-DD without timezone issues
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   useEffect(() => {
     fetchData();
   }, [selectedDate]);
@@ -26,14 +36,17 @@ const EditTopCustomersCardPage = () => {
     setMessage(null);
     try {
       const response = await topCustomersCardService.getByDate(selectedDate);
+      console.log("Fetched top customers data:", response);
       if (response.data && !Array.isArray(response.data)) {
         const data = response.data as TopCustomersCardData;
+        console.log("Loading customers:", data.customers);
         setFormData({
           customers: data.customers || [],
           notes: data.notes || "",
           updatedBy: "Admin",
         });
       } else {
+        console.log("No data found, resetting to empty");
         setFormData({
           customers: [],
           notes: "",
@@ -42,6 +55,11 @@ const EditTopCustomersCardPage = () => {
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+      setFormData({
+        customers: [],
+        notes: "",
+        updatedBy: "Admin",
+      });
     } finally {
       setLoading(false);
     }
@@ -149,9 +167,13 @@ const EditTopCustomersCardPage = () => {
             </label>
             <input
               type="date"
-              value={selectedDate.toISOString().split("T")[0]}
-              max={new Date().toISOString().split("T")[0]}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              value={formatDateString(selectedDate)}
+              max={formatDateString(new Date())}
+              onChange={(e) => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                const newDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+                setSelectedDate(newDate);
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>

@@ -9,24 +9,26 @@ import { asyncHandler } from "../middleware/error.middleware";
 
 export const getPaymentsCard = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const date = req.query.date as string;
+    const dateStr = req.query.date as string;
 
-    if (!date) {
+    if (!dateStr) {
       return res.status(400).json({
         status: "error",
         message: "Date parameter is required",
       });
     }
 
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid date format",
+        message: "Invalid date format. Expected YYYY-MM-DD",
       });
     }
 
-    const card = await getPaymentsCardByDate(dateObj);
+    console.log("🔍 Backend received date string:", dateStr);
+    const card = await getPaymentsCardByDate(dateStr);
+    console.log("🔍 Backend found card:", card ? "YES" : "NO");
 
     return res.status(200).json({
       status: "success",
@@ -77,15 +79,15 @@ export const createOrUpdatePaymentsCardHandler = asyncHandler(
       });
     }
 
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) {
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid date format",
+        message: "Invalid date format. Expected YYYY-MM-DD",
       });
     }
 
-    const card = await createOrUpdatePaymentsCard(dateObj, {
+    const card = await createOrUpdatePaymentsCard(date, {
       transactions: transactions || [],
       totalPayments,
       successfulPayments,
@@ -104,24 +106,24 @@ export const createOrUpdatePaymentsCardHandler = asyncHandler(
 
 export const deletePaymentsCardHandler = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { date } = req.query;
+    const dateStr = req.query.date as string;
 
-    if (!date) {
+    if (!dateStr) {
       return res.status(400).json({
         status: "error",
         message: "Date parameter is required",
       });
     }
 
-    const dateObj = new Date(date as string);
-    if (isNaN(dateObj.getTime())) {
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return res.status(400).json({
         status: "error",
-        message: "Invalid date format",
+        message: "Invalid date format. Expected YYYY-MM-DD",
       });
     }
 
-    await deletePaymentsCard(dateObj);
+    await deletePaymentsCard(dateStr);
 
     return res.status(200).json({
       status: "success",

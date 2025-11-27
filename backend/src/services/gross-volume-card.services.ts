@@ -3,10 +3,19 @@ import { GrossVolumeCard, type IGrossVolumeCard } from "../models/gross-volume-c
 export const getGrossVolumeCardByDate = async (
   date: Date
 ): Promise<IGrossVolumeCard | null> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  // Create UTC start and end of day
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
+  const endOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    23, 59, 59, 999
+  ));
 
   return GrossVolumeCard.findOne({
     date: {
@@ -32,30 +41,45 @@ export const createOrUpdateGrossVolumeCard = async (
   date: Date,
   data: Partial<IGrossVolumeCard>
 ): Promise<IGrossVolumeCard> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Create UTC start of day for the given date
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
-  const existing = await GrossVolumeCard.findOne({
-    date: {
-      $gte: startOfDay,
-      $lte: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+  const result = await GrossVolumeCard.findOneAndUpdate(
+    {
+      date: {
+        $gte: startOfDay,
+        $lte: new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000),
+      },
     },
-  });
+    {
+      $set: {
+        date: startOfDay,
+        ...data,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    }
+  );
 
-  if (existing) {
-    Object.assign(existing, data);
-    return existing.save();
-  }
-
-  return GrossVolumeCard.create({
-    date: startOfDay,
-    ...data,
-  });
+  return result!;
 };
 
 export const deleteGrossVolumeCard = async (date: Date): Promise<void> => {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
+  // Create UTC start of day
+  const startOfDay = new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    0, 0, 0, 0
+  ));
 
   await GrossVolumeCard.deleteOne({
     date: {

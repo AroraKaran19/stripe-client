@@ -5,13 +5,24 @@ import type { PaymentsCardData, PaymentTransaction } from "../../services/paymen
 
 const EditPaymentsCardPage = () => {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Initialize with today at noon to avoid timezone issues
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [notes, setNotes] = useState("");
+
+  // Helper to format date as YYYY-MM-DD without timezone issues
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -21,17 +32,30 @@ const EditPaymentsCardPage = () => {
     setLoading(true);
     setMessage(null);
     try {
+      console.log("📅 Selected Date Object:", selectedDate);
+      console.log("📅 Formatted Date String:", formatDateString(selectedDate));
+      console.log("📅 Date components:", {
+        year: selectedDate.getFullYear(),
+        month: selectedDate.getMonth() + 1,
+        day: selectedDate.getDate()
+      });
+      
       const response = await paymentsCardService.getByDate(selectedDate);
+      console.log("Fetched payments data:", response);
       if (response.data && !Array.isArray(response.data)) {
         const data = response.data as PaymentsCardData;
+        console.log("Loading transactions:", data.transactions);
         setTransactions(data.transactions || []);
         setNotes(data.notes || "");
       } else {
+        console.log("No data found, resetting to empty");
         setTransactions([]);
         setNotes("");
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+      setTransactions([]);
+      setNotes("");
     } finally {
       setLoading(false);
     }
@@ -41,7 +65,7 @@ const EditPaymentsCardPage = () => {
     const newTransaction: PaymentTransaction = {
       id: Date.now().toString(),
       description: "Product Purchase",
-      date: selectedDate.toISOString().split('T')[0],
+      date: formatDateString(selectedDate),
       amount: 0,
       status: "successful",
     };
@@ -146,9 +170,14 @@ const EditPaymentsCardPage = () => {
             </label>
             <input
               type="date"
-              value={selectedDate.toISOString().split("T")[0]}
-              max={new Date().toISOString().split("T")[0]}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              value={formatDateString(selectedDate)}
+              max={formatDateString(new Date())}
+              onChange={(e) => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                const newDate = new Date(year, month - 1, day, 12, 0, 0, 0); // Set to noon to avoid timezone issues
+                console.log("📅 Date picker changed to:", e.target.value, "→", newDate);
+                setSelectedDate(newDate);
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -201,7 +230,7 @@ const EditPaymentsCardPage = () => {
                             <input
                               type="date"
                               value={transaction.date}
-                              max={new Date().toISOString().split("T")[0]}
+                              max={formatDateString(new Date())}
                               onChange={(e) => updateTransaction(transaction.id, "date", e.target.value)}
                               className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />

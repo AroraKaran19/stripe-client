@@ -1,10 +1,16 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface TimeSeriesData {
+  timestamp: Date;
+  value: number;
+}
+
 export interface INetVolumeCard extends Document {
   date: Date;
   value: number;
   change: number;
   changePercent: number;
+  timeSeries: TimeSeriesData[];
   notes?: string;
   updatedAt: Date;
   updatedBy?: string;
@@ -34,6 +40,19 @@ const NetVolumeCardSchema = new Schema(
       required: true,
       default: 0,
     },
+    timeSeries: [
+      {
+        timestamp: {
+          type: Date,
+          required: true,
+        },
+        value: {
+          type: Number,
+          required: true,
+          default: 0,
+        },
+      },
+    ],
     notes: {
       type: String,
       default: "",

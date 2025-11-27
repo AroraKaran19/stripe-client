@@ -30,6 +30,14 @@ const EditTopSectionCardPage = () => {
     updatedBy: "Admin",
   });
 
+  // Helper to format date as YYYY-MM-DD without timezone issues
+  const formatDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   useEffect(() => {
     fetchData();
   }, [selectedDate]);
@@ -184,7 +192,7 @@ const EditTopSectionCardPage = () => {
     const metric = formData[metricName] as MetricData;
     const entry = metric.timeSeries.current.find((ts) => {
       const tsDate = new Date(ts.timestamp);
-      return tsDate.getHours() === hour;
+      return tsDate.getUTCHours() === hour;
     });
     
     return entry?.value || 0;
@@ -226,9 +234,12 @@ const EditTopSectionCardPage = () => {
             </label>
             <input
               type="date"
-              value={selectedDate.toISOString().split("T")[0]}
-              max={new Date().toISOString().split("T")[0]}
-              onChange={(e) => setSelectedDate(new Date(e.target.value))}
+              value={formatDateString(selectedDate)}
+              max={formatDateString(new Date())}
+              onChange={(e) => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                setSelectedDate(new Date(year, month - 1, day));
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>

@@ -15,6 +15,7 @@ interface SecondSectionHeaderProps {
   frequency: string;
   compareOption?: string | null;
   dateRangeObj?: DateRange;
+  availableFrequencies?: string[];
   onDateRangeChange: (range: DateRange) => void;
   onFrequencyChange: (freq: string) => void;
   onCompareChange?: (option: string | null) => void;
@@ -23,9 +24,12 @@ interface SecondSectionHeaderProps {
   isEditMode?: boolean;
 }
 
-const frequencyOptions = [
-  { value: "daily", label: "Daily" },
+const allFrequencyOptions = [
   { value: "hourly", label: "Hourly" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
 ];
 
 const compareOptions = [
@@ -41,6 +45,7 @@ const SecondSectionHeader = ({
   frequency,
   compareOption = null,
   dateRangeObj,
+  availableFrequencies = ["daily"],
   onDateRangeChange,
   onFrequencyChange,
   onCompareChange,
@@ -48,6 +53,10 @@ const SecondSectionHeader = ({
   onEditClick,
   isEditMode = false,
 }: SecondSectionHeaderProps) => {
+  // Filter frequency options based on available frequencies
+  const frequencyOptions = allFrequencyOptions.filter(opt => 
+    availableFrequencies.includes(opt.value)
+  );
   const [dateRangePickerOpen, setDateRangePickerOpen] = useState(false);
   const [frequencyOpen, setFrequencyOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);

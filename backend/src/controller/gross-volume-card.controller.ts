@@ -67,7 +67,7 @@ export const getGrossVolumeCardRange = asyncHandler(
 
 export const createOrUpdateGrossVolumeCardHandler = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { date, value, change, changePercent, notes, updatedBy } = req.body;
+    const { date, value, change, changePercent, timeSeries, notes, updatedBy } = req.body;
 
     if (!date || value === undefined) {
       return res.status(400).json({
@@ -88,6 +88,7 @@ export const createOrUpdateGrossVolumeCardHandler = asyncHandler(
       value,
       change: change || 0,
       changePercent: changePercent || 0,
+      timeSeries: timeSeries || [],
       notes,
       updatedBy,
     });

@@ -61,6 +61,7 @@ const Homepage = () => {
     };
   });
   const [overviewFrequency, setOverviewFrequency] = useState("daily");
+  const [availableFrequencies, setAvailableFrequencies] = useState<string[]>(["daily"]);
   const [overviewCompareOption, setOverviewCompareOption] = useState<string | null>(null);
   const [overviewAnalytics, setOverviewAnalytics] = useState<AnalyticsData | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
@@ -144,6 +145,18 @@ const Homepage = () => {
                 previous: convertTimeSeries(topSectionData.newCustomers.timeSeries.previous),
               },
             },
+            successfulPayments: {
+              current: topSectionData.successfulPayments.current,
+              previous: topSectionData.successfulPayments.previous,
+              change: topSectionData.successfulPayments.current - topSectionData.successfulPayments.previous,
+              changePercent: topSectionData.successfulPayments.previous !== 0
+                ? ((topSectionData.successfulPayments.current - topSectionData.successfulPayments.previous) / topSectionData.successfulPayments.previous) * 100
+                : 0,
+              timeSeries: {
+                current: convertTimeSeries(topSectionData.successfulPayments.timeSeries.current),
+                previous: convertTimeSeries(topSectionData.successfulPayments.timeSeries.previous),
+              },
+            },
             payments: [], // Not needed for top section
             failedPayments: [],
             topCustomersBySpend: [],
@@ -175,27 +188,108 @@ const Homepage = () => {
   }, [topSelectedDate]);
 
   // Fetch analytics for the overview section (separate state and request)
+  // Calculate available frequencies based on date range
+  useEffect(() => {
+    const daysDiff = Math.ceil(
+      (overviewDateRange.end.getTime() - overviewDateRange.start.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    console.log("📅 Date Range Changed:", {
+      start: overviewDateRange.start.toISOString().split('T')[0],
+      end: overviewDateRange.end.toISOString().split('T')[0],
+      daysDiff,
+      currentFrequency: overviewFrequency
+    });
+
+    let frequencies: string[] = [];
+    let defaultFreq = "daily";
+
+    if (daysDiff === 0) {
+      // Only 1 day: hourly only
+      frequencies = ["hourly"];
+      defaultFreq = "hourly";
+    } else if (daysDiff < 7) {
+      // Less than 7 days: hourly and daily
+      frequencies = ["hourly", "daily"];
+      defaultFreq = "daily";
+    } else if (daysDiff >= 28 && daysDiff < 90) {
+      // 4 weeks to less than 3 months: daily and weekly
+      frequencies = ["daily", "weekly"];
+      defaultFreq = "daily";
+    } else if (daysDiff >= 90 && daysDiff < 365) {
+      // 3 months to less than 1 year: weekly and monthly
+      frequencies = ["weekly", "monthly"];
+      defaultFreq = "weekly";
+    } else if (daysDiff >= 365 && daysDiff < 1095) {
+      // 1 year to less than 3 years: monthly only
+      frequencies = ["monthly"];
+      defaultFreq = "monthly";
+    } else if (daysDiff >= 1095) {
+      // More than 3 years: monthly and yearly
+      frequencies = ["monthly", "yearly"];
+      defaultFreq = "monthly";
+    } else {
+      // 7 to 27 days: daily only (fallback)
+      frequencies = ["daily"];
+      defaultFreq = "daily";
+    }
+
+    console.log("⚙️ Available Frequencies:", frequencies, "Default:", defaultFreq);
+    setAvailableFrequencies(frequencies);
+
+    // Auto-set frequency if current selection is not available
+    if (!frequencies.includes(overviewFrequency)) {
+      console.log("🔄 Auto-switching frequency from", overviewFrequency, "to", defaultFreq);
+      setOverviewFrequency(defaultFreq);
+    }
+  }, [overviewDateRange, overviewFrequency]);
+
   useEffect(() => {
     const fetchOverview = async () => {
       setOverviewLoading(true);
       setOverviewError(null);
       try {
-        // For overview, check if single day to auto-enable hourly
+        // Check if single day for proper frequency handling
         const isSingleDay =
           overviewDateRange.start.getFullYear() === overviewDateRange.end.getFullYear() &&
           overviewDateRange.start.getMonth() === overviewDateRange.end.getMonth() &&
           overviewDateRange.start.getDate() === overviewDateRange.end.getDate();
 
-        const effectiveFrequency = isSingleDay ? "hourly" : overviewFrequency;
+        // For hourly with multi-day range, only fetch the last day's hourly data
+        let fetchStartDate = overviewDateRange.start;
+        let fetchEndDate = overviewDateRange.end;
+        
+        if (overviewFrequency === "hourly" && !isSingleDay) {
+          // Only fetch hourly data for the end date
+          fetchStartDate = new Date(overviewDateRange.end);
+          fetchStartDate.setHours(0, 0, 0, 0);
+          console.log("⚠️ Hourly selected with multi-day range - showing only last day's hourly data");
+        }
+
+        console.log("📊 Fetching Overview Data:", {
+          frequency: overviewFrequency,
+          dateRange: overviewDateRange.label,
+          startDate: fetchStartDate.toISOString().split('T')[0],
+          endDate: fetchEndDate.toISOString().split('T')[0],
+          compareOption: overviewCompareOption || "none",
+          isSingleDay
+        });
 
         // Normalize dates to UTC start/end of day
         const response = await analyticsService.getAnalytics(
           "custom",
-          effectiveFrequency,
-          normalizeToUTC(overviewDateRange.start, false),
-          normalizeToUTC(overviewDateRange.end, true),
+          overviewFrequency,
+          normalizeToUTC(fetchStartDate, false),
+          normalizeToUTC(fetchEndDate, true),
           overviewCompareOption || "none"
         );
+        
+        console.log("✅ Overview Data Received:", {
+          grossVolume: response.data.grossVolume.current,
+          dataPoints: response.data.grossVolume.timeSeries.current.length,
+          sampleDates: response.data.grossVolume.timeSeries.current.slice(0, 3).map(d => d.date),
+          frequency: overviewFrequency
+        });
         
         let analyticsData = response.data;
 
@@ -218,10 +312,10 @@ const Homepage = () => {
 
             // Manual card data fetched
 
-            // Override with manual data if available
-            if (grossVolumeCard.status === 'fulfilled' && grossVolumeCard.value.data && !Array.isArray(grossVolumeCard.value.data)) {
+            // Override with manual data if available (only for hourly frequency)
+            if (overviewFrequency === "hourly" && grossVolumeCard.status === 'fulfilled' && grossVolumeCard.value.data && !Array.isArray(grossVolumeCard.value.data)) {
               const data = grossVolumeCard.value.data;
-              // Overriding Gross Volume with manual data
+              console.log("📝 Overriding Gross Volume with manual hourly data");
               
               // Convert timeSeries if available
               let timeSeriesCurrent = analyticsData.grossVolume.timeSeries.current;
@@ -249,8 +343,6 @@ const Homepage = () => {
                     value: hourlyMap.get(hour) || 0, // Use 0 for missing hours
                   });
                 }
-                
-                // Gross Volume timeSeries processed
               }
               
               analyticsData.grossVolume = {
@@ -265,7 +357,7 @@ const Homepage = () => {
               };
             }
 
-            if (netVolumeCard.status === 'fulfilled' && netVolumeCard.value.data && !Array.isArray(netVolumeCard.value.data)) {
+            if (overviewFrequency === "hourly" && netVolumeCard.status === 'fulfilled' && netVolumeCard.value.data && !Array.isArray(netVolumeCard.value.data)) {
               const data = netVolumeCard.value.data;
               // Overriding Net Volume with manual data
               
@@ -392,7 +484,7 @@ const Homepage = () => {
               }
             }
 
-            if (newCustomersCard.status === 'fulfilled' && newCustomersCard.value.data && !Array.isArray(newCustomersCard.value.data)) {
+            if (overviewFrequency === "hourly" && newCustomersCard.status === 'fulfilled' && newCustomersCard.value.data && !Array.isArray(newCustomersCard.value.data)) {
               const data = newCustomersCard.value.data;
               // Overriding New Customers with manual data
               analyticsData.newCustomers = {
@@ -427,11 +519,12 @@ const Homepage = () => {
           
           try {
             // Fetch data for the entire range
-            const [grossVolumeRange, netVolumeRange, paymentsRange, failedPaymentsRange, topCustomersRange] = await Promise.allSettled([
+            const [grossVolumeRange, netVolumeRange, paymentsRange, failedPaymentsRange, newCustomersRange, topCustomersRange] = await Promise.allSettled([
               grossVolumeCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
               netVolumeCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
               paymentsCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
               failedPaymentsCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
+              newCustomersCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
               topCustomersCardService.getByDateRange(overviewDateRange.start, overviewDateRange.end),
             ]);
 
@@ -524,18 +617,13 @@ const Homepage = () => {
             }
 
             // Process Payments range data - aggregate all transactions from all days
-            console.log("DEBUG - paymentsRange:", paymentsRange);
             if (paymentsRange.status === 'fulfilled' && paymentsRange.value.data && Array.isArray(paymentsRange.value.data)) {
               const dataArray = paymentsRange.value.data;
-              console.log("DEBUG - Payments dataArray:", dataArray);
-              console.log("DEBUG - First item transactions:", dataArray[0]?.transactions);
               
               // Aggregate all transactions from all days
               const allTransactions: any[] = [];
               dataArray.forEach(dayData => {
-                console.log("DEBUG - dayData.transactions:", dayData.transactions);
                 if (dayData.transactions && dayData.transactions.length > 0) {
-                  console.log("DEBUG - Found", dayData.transactions.length, "transactions");
                   dayData.transactions.forEach(t => {
                     allTransactions.push({
                       _id: t.id,
@@ -572,11 +660,9 @@ const Homepage = () => {
                 }
               });
               
-              console.log("DEBUG - Total allTransactions:", allTransactions.length);
               if (allTransactions.length > 0) {
                 // Total payment transactions aggregated
                 analyticsData.payments = allTransactions;
-                console.log("DEBUG - Set analyticsData.payments to:", allTransactions);
               }
             }
 
@@ -631,6 +717,22 @@ const Homepage = () => {
               }
             }
 
+            // Process New Customers range data - aggregate counts across all days
+            if (newCustomersRange.status === 'fulfilled' && newCustomersRange.value.data && Array.isArray(newCustomersRange.value.data)) {
+              const dataArray = newCustomersRange.value.data;
+              
+              // Sum up all counts from all days
+              const totalCount = dataArray.reduce((sum, dayData) => sum + (dayData.count || 0), 0);
+              
+              if (totalCount > 0) {
+                // Override New Customers with aggregated data
+                analyticsData.newCustomers = {
+                  ...analyticsData.newCustomers,
+                  current: totalCount,
+                };
+              }
+            }
+
             // Process Top Customers range data - aggregate and rank by total spend
             if (topCustomersRange.status === 'fulfilled' && topCustomersRange.value.data && Array.isArray(topCustomersRange.value.data)) {
               const dataArray = topCustomersRange.value.data;
@@ -673,7 +775,6 @@ const Homepage = () => {
         }
 
         // Analytics data prepared
-        console.log("DEBUG - Final analyticsData.payments:", analyticsData.payments.length, analyticsData.payments);
 
         setOverviewAnalytics(analyticsData);
       } catch (err) {
@@ -704,25 +805,7 @@ const Homepage = () => {
       case "new_customers":
         return topAnalytics.newCustomers.current;
       case "successful_payments":
-        return topAnalytics.payments.filter((p: any) => p.status === "succeeded").length;
-      default:
-        return 0;
-    }
-  };
-
-  const getPreviousMetricValue = () => {
-    if (!topAnalytics) return 0;
-    switch (selectedMetric) {
-      case "gross_volume":
-        return topAnalytics.grossVolume.previous;
-      case "net_volume":
-        return topAnalytics.netVolume.previous;
-      case "new_customers":
-        return topAnalytics.newCustomers.previous;
-      case "successful_payments":
-        // For successful payments, we'd need previous period payments data
-        // For now, return 0 or calculate from failed payments if available
-        return 0;
+        return topAnalytics.successfulPayments.current;
       default:
         return 0;
     }
@@ -738,9 +821,7 @@ const Homepage = () => {
       case "new_customers":
         return topAnalytics.newCustomers.timeSeries;
       case "successful_payments":
-        // For successful payments, we'd need to generate time series from payments
-        // For now, return empty or use gross volume as placeholder
-        return topAnalytics.grossVolume.timeSeries;
+        return topAnalytics.successfulPayments.timeSeries;
       default:
         return { current: [], previous: [] };
     }
@@ -1184,7 +1265,7 @@ const Homepage = () => {
               <div className="date-tab-switch flex flex-col shrink-0 relative">
               <button
                   ref={compareDateButtonRef}
-                className="flex items-center gap-1 mb-1 rounded-md cursor-pointer text-gray-600"
+                className="flex items-center gap-1 rounded-md cursor-pointer text-gray-600"
                   onClick={() => {
                     if (!compareDatePickerOpen) {
                       updateCompareDatePickerPosition();
@@ -1205,9 +1286,6 @@ const Homepage = () => {
                   )}
                 />
               </button>
-                <span className="text-xl font-normal text-[#353a44]">
-                  {formatMetricValue(getPreviousMetricValue())}
-              </span>
                 {compareDatePickerOpen &&
                   createPortal(
                     <div
@@ -1250,18 +1328,9 @@ const Homepage = () => {
         frequency={overviewFrequency}
         compareOption={overviewCompareOption}
         dateRangeObj={overviewDateRange}
+        availableFrequencies={availableFrequencies}
         onDateRangeChange={(range) => {
           setOverviewDateRange(range);
-          // Auto-switch to hourly for single day
-          if (
-            range.start.getFullYear() === range.end.getFullYear() &&
-            range.start.getMonth() === range.end.getMonth() &&
-            range.start.getDate() === range.end.getDate()
-          ) {
-            setOverviewFrequency("hourly");
-          } else if (overviewFrequency === "hourly") {
-            setOverviewFrequency("daily");
-          }
         }}
         onFrequencyChange={setOverviewFrequency}
         onCompareChange={setOverviewCompareOption}
