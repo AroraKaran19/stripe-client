@@ -45,6 +45,7 @@ const CreateTransactionModal = ({
       score: 0,
       level: "low",
     },
+    activity_history: [],
     items: [],
   });
 
@@ -60,6 +61,16 @@ const CreateTransactionModal = ({
       // Generate fingerprint if not provided
       if (!formData.fingerprint) {
         formData.fingerprint = `fp_${Math.random().toString(36).substr(2, 9)}`;
+      }
+
+      // Initialize activity_history if not provided
+      if (!formData.activity_history || formData.activity_history.length === 0) {
+        formData.activity_history = [
+          {
+            activity: "Started",
+            timestamp: new Date(),
+          },
+        ];
       }
 
       await transactionService.create(formData);
@@ -91,6 +102,7 @@ const CreateTransactionModal = ({
           score: 0,
           level: "low",
         },
+        activity_history: [],
         items: [],
       });
     } catch (err) {
@@ -247,6 +259,50 @@ const CreateTransactionModal = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Statement Descriptor
+                </label>
+                <input
+                  type="text"
+                  value={formData.statement_descriptor || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, statement_descriptor: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fingerprint
+                </label>
+                <input
+                  type="text"
+                  value={formData.fingerprint || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, fingerprint: e.target.value })
+                  }
+                  placeholder="fp_... (auto-generated if empty)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Card Number
+                </label>
+                <input
+                  type="text"
+                  value={formData.number || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, number: e.target.value })
+                  }
+                  placeholder="Last 4 digits or full number"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                />
+              </div>
             </div>
 
             {/* Customer Information */}
@@ -351,7 +407,7 @@ const CreateTransactionModal = ({
             <h3 className="text-sm font-semibold text-gray-900 mb-3">
               Payment Method
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Card Type *
@@ -380,7 +436,7 @@ const CreateTransactionModal = ({
                         ...formData.payment_method,
                         cart_last_four: e.target.value,
                       },
-                      number: e.target.value,
+                      number: e.target.value || formData.number || "",
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
@@ -402,6 +458,89 @@ const CreateTransactionModal = ({
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Issuer *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.issuer || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, issuer: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={formData.cvc_check || false}
+                    onChange={(e) =>
+                      setFormData({ ...formData, cvc_check: e.target.checked })
+                    }
+                    className="rounded border-gray-300 text-[#533afd] focus:ring-[#533afd]"
+                  />
+                  CVC Check Passed
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Risk Evaluation */}
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">
+              Risk Evaluation
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Risk Score
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={formData.risk_evaluation?.score || 0}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      risk_evaluation: {
+                        ...formData.risk_evaluation,
+                        score: parseInt(e.target.value) || 0,
+                        level: formData.risk_evaluation?.level || "low",
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Risk Level *
+                </label>
+                <select
+                  required
+                  value={formData.risk_evaluation?.level || "low"}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      risk_evaluation: {
+                        score: formData.risk_evaluation?.score || 0,
+                        level: e.target.value as "low" | "normal" | "high",
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Additional Fields */}
@@ -416,6 +555,7 @@ const CreateTransactionModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, type: e.target.value })
                 }
+                placeholder="e.g., Visa credit card"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
               />
             </div>
@@ -429,6 +569,7 @@ const CreateTransactionModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, origin: e.target.value })
                 }
+                placeholder="e.g., US"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
               />
             </div>
@@ -442,6 +583,7 @@ const CreateTransactionModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, transferred_to: e.target.value })
                 }
+                placeholder="Account ID"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
               />
             </div>
@@ -455,6 +597,7 @@ const CreateTransactionModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, decline_reason: e.target.value })
                 }
+                placeholder="Reason for decline"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
               />
             </div>
@@ -482,6 +625,138 @@ const CreateTransactionModal = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Refunded Date
+              </label>
+              <input
+                type="datetime-local"
+                value={
+                  formData.refunded_date
+                    ? new Date(formData.refunded_date)
+                        .toISOString()
+                        .slice(0, 16)
+                    : ""
+                }
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    refunded_date: e.target.value
+                      ? new Date(e.target.value)
+                      : undefined,
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd]"
+              />
+            </div>
+          </div>
+
+          {/* Activity History */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Activity History
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  const newActivity = {
+                    activity: "Started" as const,
+                    timestamp: new Date(),
+                  };
+                  setFormData({
+                    ...formData,
+                    activity_history: [
+                      ...(formData.activity_history || []),
+                      newActivity,
+                    ],
+                  });
+                }}
+                className="text-sm text-[#533afd] hover:underline font-medium cursor-pointer"
+              >
+                + Add Activity
+              </button>
+            </div>
+            {formData.activity_history?.map((activity, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 p-3 bg-gray-50 rounded-lg"
+              >
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Activity
+                  </label>
+                  <select
+                    value={activity.activity}
+                    onChange={(e) => {
+                      const newHistory = [...(formData.activity_history || [])];
+                      newHistory[index] = {
+                        ...newHistory[index],
+                        activity: e.target.value as "Started" | "Authorized",
+                      };
+                      setFormData({
+                        ...formData,
+                        activity_history: newHistory,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd] text-sm"
+                  >
+                    <option value="Started">Started</option>
+                    <option value="Authorized">Authorized</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Timestamp
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={
+                      activity.timestamp
+                        ? new Date(activity.timestamp)
+                            .toISOString()
+                            .slice(0, 16)
+                        : ""
+                    }
+                    onChange={(e) => {
+                      const newHistory = [...(formData.activity_history || [])];
+                      newHistory[index] = {
+                        ...newHistory[index],
+                        timestamp: e.target.value
+                          ? new Date(e.target.value)
+                          : new Date(),
+                      };
+                      setFormData({
+                        ...formData,
+                        activity_history: newHistory,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#533afd] text-sm"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newHistory = [...(formData.activity_history || [])];
+                      newHistory.splice(index, 1);
+                      setFormData({
+                        ...formData,
+                        activity_history: newHistory,
+                      });
+                    }}
+                    className="w-full px-3 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors cursor-pointer text-sm"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            {(!formData.activity_history || formData.activity_history.length === 0) && (
+              <p className="text-sm text-gray-500 italic">
+                No activity history. At least one activity will be auto-added on submit.
+              </p>
+            )}
           </div>
 
           {/* Items */}
