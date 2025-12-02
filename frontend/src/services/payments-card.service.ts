@@ -40,9 +40,6 @@ export interface PaymentsCardResponse {
 export const paymentsCardService = {
   getByDate: async (date: Date): Promise<PaymentsCardResponse> => {
     const dateStr = formatDateString(date);
-    console.log("🌐 API Request - Date Object:", date);
-    console.log("🌐 API Request - Formatted String:", dateStr);
-    console.log("🌐 API Request - Full URL:", `${API_BASE_URL}/payments-card?date=${dateStr}`);
     const response = await fetch(
       `${API_BASE_URL}/payments-card?date=${dateStr}`
     );

@@ -466,13 +466,13 @@ const DateRangePicker = ({
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={handleClear}
-                className="px-4 py-2 text-xs font-semibold text-[#353a44] bg-white border border-[#e5e7eb] rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 cursor-pointer text-xs font-semibold text-[#353a44] bg-white border border-[#e5e7eb] rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Clear
               </button>
               <button
                 onClick={(e) => handleApply(e)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-[#533afd] rounded-lg hover:bg-[#4328e8] transition-colors"
+                className="px-4 py-2 cursor-pointer text-xs font-semibold text-white bg-[#533afd] rounded-lg hover:bg-[#4328e8] transition-colors"
               >
                 Apply
               </button>

@@ -3,6 +3,7 @@ import cors from "cors";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware";
 import transactionRoutes from "./routes/transaction.routes";
 import analyticsRoutes from "./routes/analytics.routes";
+import homepageRoutes from "./routes/homepage.routes";
 import paymentsCardRoutes from "./routes/payments-card.routes";
 import grossVolumeCardRoutes from "./routes/gross-volume-card.routes";
 import netVolumeCardRoutes from "./routes/net-volume-card.routes";
@@ -34,6 +35,7 @@ app.get("/health", (req, res) => {
 // API Routes
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/homepage", homepageRoutes);
 app.use("/api/payments-card", paymentsCardRoutes);
 app.use("/api/gross-volume-card", grossVolumeCardRoutes);
 app.use("/api/net-volume-card", netVolumeCardRoutes);

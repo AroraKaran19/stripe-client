@@ -4,3 +4,15 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
+
+/* Disable browser spell-check underlines and text decorations */
+span, div, p, label, td, th {
+  text-decoration: none !important;
+}
+
+/* Remove any browser-added spell-check styling */
+::spelling-error,
+::grammar-error {
+  text-decoration: none !important;
+  background: none !important;
+}

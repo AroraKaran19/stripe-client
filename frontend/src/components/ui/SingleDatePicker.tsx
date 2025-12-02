@@ -218,7 +218,7 @@ const SingleDatePicker = ({
           </button>
           <button
             onClick={handleApply}
-            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#533afd] rounded-md hover:bg-[#4328e8] transition-colors"
+            className="px-3 py-1.5 cursor-pointer text-xs font-semibold text-white bg-[#5333afd] rounded-md hover:bg-[#4328e8] transition-colors"
           >
             Apply
           </button>

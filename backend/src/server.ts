@@ -1,5 +1,6 @@
 import app from "./app";
 import { connectDB, disconnectDB } from "./config/database";
+import { ensureDefaultHomepage } from "./services/homepage.services";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -10,6 +11,10 @@ const startServer = async () => {
   try {
     // Connect to MongoDB
     await connectDB();
+
+    // Ensure a default homepage exists
+    await ensureDefaultHomepage();
+    console.log("✅ Default homepage ensured");
 
     const server = app.listen(PORT, () => {
       console.log(`🚀 Stripe Client Backend Server is running on port ${PORT}`);

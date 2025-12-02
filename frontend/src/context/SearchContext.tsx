@@ -21,7 +21,6 @@ export const SearchProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setIsLoading(true);
     const timeout = setTimeout(() => {
-      console.log("search", search);
       setIsLoading(false);
     }, 1000);
     return () => clearTimeout(timeout);

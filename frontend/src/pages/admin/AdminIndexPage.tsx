@@ -1,12 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import {
-  LayoutDashboard,
-  CreditCard,
-  Settings,
-  Shield,
-  ArrowRight,
-} from "lucide-react";
+import { LayoutDashboard, CreditCard, ArrowRight } from "lucide-react";
 import { cn } from "../../utils";
 
 const AdminIndexPage = () => {
@@ -15,19 +9,23 @@ const AdminIndexPage = () => {
 
   const cards = [
     {
-      title: "Home Page Management",
+      title: "HomePage Management",
       description:
         "Configure and customize dashboard sections, analytics cards, and homepage content",
       icon: LayoutDashboard,
-      gradient: "from-blue-500 to-cyan-500",
+      gradient: "from-blue-500 via-blue-600 to-cyan-500",
+      hoverGradient: "from-blue-600 via-blue-700 to-cyan-600",
+      bgGradient: "from-blue-50 via-cyan-50 to-blue-50",
       onClick: () => navigate("/admin/home"),
     },
     {
-      title: "Transaction Management",
+      title: "Transactions Management",
       description:
         "View, create, edit, and manage all payment transactions and records",
       icon: CreditCard,
-      gradient: "from-purple-500 to-pink-500",
+      gradient: "from-purple-500 via-purple-600 to-pink-500",
+      hoverGradient: "from-purple-600 via-purple-700 to-pink-600",
+      bgGradient: "from-purple-50 via-pink-50 to-purple-50",
       onClick: () => navigate("/admin/transactions"),
     },
   ];
@@ -47,114 +45,87 @@ const AdminIndexPage = () => {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-        {/* Header Section */}
-        <div className="border-b border-gray-200 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-6 py-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-[#533afd]/10 rounded-lg">
-                <Shield className="h-6 w-6 text-[#533afd]" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Admin Dashboard
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  Manage your platform settings and content
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          {/* Quick Stats Section */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">
-              Quick Access
-            </h2>
-            <p className="text-sm text-gray-500">
-              Select a section below to manage different aspects of your
-              platform
-            </p>
+      <div className="min-h-[calc(100vh-60px)] w-full bg-gradient-to-br flex items-center justify-center p-6">
+        <div className="w-full max-w-6xl">
+          {/* Header Section */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              Admin Dashboard
+            </h1>
           </div>
 
           {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {cards.map((card) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {cards.map((card, index) => {
               const Icon = card.icon;
               return (
                 <button
-                  key={card.title}
+                  key={index}
                   onClick={card.onClick}
                   className={cn(
-                    "group relative text-left rounded-xl border border-gray-200",
-                    "bg-white hover:border-[#533afd]/30 hover:shadow-xl",
-                    "transition-all duration-300 overflow-hidden",
-                    "hover:-translate-y-1"
+                    "group relative text-left rounded-2xl border-2 border-gray-200 cursor-pointer",
+                    "bg-white hover:border-transparent",
+                    "transition-all duration-500 overflow-hidden",
+                    "hover:-translate-y-2 hover:shadow-2xl",
+                    "focus:outline-none focus:ring-4 focus:ring-opacity-50"
                   )}
                 >
-                  {/* Gradient Accent */}
+                  {/* Background Gradient on Hover */}
                   <div
                     className={cn(
-                      "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
-                      card.gradient
+                      "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-100",
+                      card.bgGradient,
+                      "transition-opacity duration-500"
                     )}
                   />
 
-                  <div className="p-6">
-                    {/* Icon */}
+                  {/* Content Container */}
+                  <div className="relative p-8">
+                    {/* Icon Container */}
                     <div
                       className={cn(
-                        "mb-4 w-12 h-12 rounded-lg bg-gradient-to-br",
+                        "mb-6 w-16 h-16 rounded-xl bg-gradient-to-br shadow-lg",
                         card.gradient,
                         "flex items-center justify-center",
-                        "group-hover:scale-110 transition-transform duration-300"
+                        "group-hover:scale-110 group-hover:shadow-xl",
+                        "transition-all duration-500"
                       )}
                     >
-                      <Icon className="h-6 w-6 text-white" />
+                      <Icon className="h-8 w-8 text-white" />
                     </div>
 
-                    {/* Content */}
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-[#533afd] transition-colors">
+                    {/* Title */}
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3 group-hover:text-gray-900 transition-colors">
                       {card.title}
                     </h3>
-                    <p className="text-sm text-gray-600 leading-relaxed mb-4">
+
+                    {/* Description */}
+                    <p className="text-gray-600 leading-relaxed mb-6 text-base">
                       {card.description}
                     </p>
 
                     {/* Action Indicator */}
-                    <div className="flex items-center text-[#533afd] text-sm font-medium group-hover:gap-2 transition-all">
-                      <span>Open</span>
-                      <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                    <div className="flex items-center text-[#533afd] font-semibold text-base group-hover:gap-3 transition-all">
+                      <span>Manage</span>
+                      <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-2 transition-transform duration-300" />
                     </div>
                   </div>
 
-                  {/* Hover Effect Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#533afd]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  {/* Decorative Corner Accent */}
+                  <div
+                    className={cn(
+                      "absolute top-0 right-0 w-32 h-32 bg-gradient-to-br",
+                      card.gradient,
+                      "opacity-0 group-hover:opacity-10",
+                      "rounded-bl-full transition-opacity duration-500"
+                    )}
+                  />
+
+                  {/* Shine Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                 </button>
               );
             })}
-          </div>
-
-          {/* Additional Info Section */}
-          <div className="mt-12 p-6 bg-white rounded-xl border border-gray-200">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <Settings className="h-5 w-5 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                  System Information
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Use the admin dashboard to manage your platform's content and
-                  transactions. All changes are saved automatically and
-                  reflected immediately.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

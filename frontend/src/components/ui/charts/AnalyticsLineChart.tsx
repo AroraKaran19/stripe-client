@@ -212,6 +212,8 @@ const AnalyticsLineChart = ({
             return "";
           },
           padding: 4,
+          // Disable spell-check styling
+          textStrokeWidth: 0,
         },
       },
       y: {

@@ -9,17 +9,9 @@ interface NetVolumeCardProps {
   updatedAt: string;
 }
 
-const NetVolumeCard = ({ data, updatedAt }: NetVolumeCardProps) => {
+const NetVolumeCard = ({ data }: NetVolumeCardProps) => {
   const isPositive = data.changePercent >= 0;
   const currency = "US$";
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
 
   return (
     <div className="w-full h-full flex flex-col bg-white rounded-md p-3 overflow-hidden">
@@ -54,7 +46,10 @@ const NetVolumeCard = ({ data, updatedAt }: NetVolumeCardProps) => {
         </div>
       </div>
 
-      <div className="graph-content w-full flex-shrink-0 mb-1" style={{ height: "180px" }}>
+      <div
+        className="graph-content w-full flex-shrink-0 mb-1"
+        style={{ height: "180px" }}
+      >
         <AnalyticsLineChart
           key={`net-${data.current}-${data.timeSeries.current.length}`}
           currentData={data.timeSeries.current}
@@ -64,7 +59,6 @@ const NetVolumeCard = ({ data, updatedAt }: NetVolumeCardProps) => {
       </div>
 
       <div className="extra-info flex items-center justify-between text-xs flex-shrink-0 pt-1">
-        <span className="text-gray-500">Updated {formatTime(updatedAt)}</span>
         <span className="cursor-pointer text-[#533afd] hover:underline">
           View more
         </span>
@@ -74,4 +68,3 @@ const NetVolumeCard = ({ data, updatedAt }: NetVolumeCardProps) => {
 };
 
 export default NetVolumeCard;
-

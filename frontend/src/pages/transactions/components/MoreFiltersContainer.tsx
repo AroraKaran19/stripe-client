@@ -222,7 +222,7 @@ const MoreFiltersContainer = ({
                     setActiveDate(null);
                     setDateSelectionOpen(false);
                   }}
-                  className="selection-container w-full px-2 py-1 flex items-center justify-center border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                  className="selection-container cursor-pointer w-full px-2 py-1 flex items-center justify-center border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   <span className="text-sm font-semibold text-gray-700">
                     Clear
@@ -277,7 +277,7 @@ const MoreFiltersContainer = ({
                 <span className="text-sm font-semibold text-gray-700">USD</span>
                 <ChevronsUpDown className="size-3 text-gray-500" />
               </button>
-              <button className="selection-container w-full bg-[#533afd] text-white px-2 py-1 flex items-center justify-center rounded-md cursor-pointer">
+              <button className="selection-container cursor-pointer w-full bg-[#533afd] text-white px-2 py-1 flex items-center justify-center rounded-md cursor-pointer">
                 <span className="text-sm font-semibold">Apply</span>
               </button>
             </div>,

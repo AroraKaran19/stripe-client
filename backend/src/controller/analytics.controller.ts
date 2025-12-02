@@ -24,12 +24,16 @@ export const getAnalyticsHandler = asyncHandler(
       customEnd.setUTCHours(23, 59, 59, 999);
     }
 
+    // Get username from query parameter (optional)
+    const username = (req.query.username as string) || null;
+
     const analytics = await getAnalytics(
       dateRange,
       frequency,
       customStart,
       customEnd,
-      compareOption
+      compareOption,
+      username
     );
 
     res.status(200).json({

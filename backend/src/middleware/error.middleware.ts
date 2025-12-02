@@ -22,16 +22,6 @@ export const errorHandler = (
   const status = err.status || "error";
   const message = err.message || "Internal Server Error";
 
-  // Log error for debugging
-  console.error("Error:", {
-    statusCode,
-    status,
-    message,
-    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    path: req.path,
-    method: req.method,
-  });
-
   res.status(statusCode).json({
     status,
     message,

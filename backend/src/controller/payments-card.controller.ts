@@ -26,9 +26,7 @@ export const getPaymentsCard = asyncHandler(
       });
     }
 
-    console.log("🔍 Backend received date string:", dateStr);
     const card = await getPaymentsCardByDate(dateStr);
-    console.log("🔍 Backend found card:", card ? "YES" : "NO");
 
     return res.status(200).json({
       status: "success",

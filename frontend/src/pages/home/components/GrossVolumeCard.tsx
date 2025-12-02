@@ -10,17 +10,9 @@ interface GrossVolumeCardProps {
   updatedAt: string;
 }
 
-const GrossVolumeCard = ({ data, updatedAt }: GrossVolumeCardProps) => {
+const GrossVolumeCard = ({ data }: GrossVolumeCardProps) => {
   const isPositive = data.changePercent >= 0;
   const currency = "US$";
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
 
   return (
     <div className="w-full h-full flex flex-col bg-white rounded-md p-3 overflow-hidden">
@@ -69,7 +61,6 @@ const GrossVolumeCard = ({ data, updatedAt }: GrossVolumeCardProps) => {
       </div>
 
       <div className="extra-info flex items-center justify-between text-xs flex-shrink-0 pt-1">
-        <span className="text-gray-500">Updated {formatTime(updatedAt)}</span>
         <span className="cursor-pointer text-[#533afd] hover:underline">
           View more
         </span>

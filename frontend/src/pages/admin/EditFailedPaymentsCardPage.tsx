@@ -1,133 +1,201 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { failedPaymentsCardService } from "../../services/failed-payments-card.service";
-import type { FailedPaymentsCardData, FailedPaymentTransaction } from "../../services/failed-payments-card.service";
+import { useUserFromRoute } from "../../hooks/useUserFromRoute";
+import { homepageService } from "../../services/homepage.service";
+import { Plus, Trash2 } from "lucide-react";
+
+interface FailedPaymentTransaction {
+  id: string;
+  description: string;
+  date: string;
+  amount: number;
+  reason?: string;
+}
 
 const EditFailedPaymentsCardPage = () => {
   const navigate = useNavigate();
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const { username } = useUserFromRoute();
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  
-  const [transactions, setTransactions] = useState<FailedPaymentTransaction[]>([]);
-  const [notes, setNotes] = useState("");
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  // Helper to format date as YYYY-MM-DD without timezone issues
+  const [formData, setFormData] = useState({
+    transactions: [] as FailedPaymentTransaction[],
+    count: 0,
+    totalAmount: 0,
+    averageAmount: 0,
+  });
+
   const formatDateString = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
   useEffect(() => {
-    fetchData();
-  }, [selectedDate]);
+    if (username) {
+      fetchData();
+    }
+  }, [selectedDate, username]);
 
   const fetchData = async () => {
+    if (!username) {
+      setMessage({
+        type: "error",
+        text: "Username is required. Add ?user=username to the URL.",
+      });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     try {
-      const response = await failedPaymentsCardService.getByDate(selectedDate);
-      console.log("Fetched failed payments data:", response);
+      const response = await homepageService.getCard(
+        username,
+        "Failed Payments Card",
+        selectedDate
+      );
+
       if (response.data && !Array.isArray(response.data)) {
-        const data = response.data as FailedPaymentsCardData;
-        console.log("Loading failed transactions:", data.transactions);
-        setTransactions(data.transactions || []);
-        setNotes(data.notes || "");
+        const entry = response.data as any;
+        const data = entry.data;
+
+        if (data) {
+          setFormData({
+            transactions: data.transactions || [],
+            count: data.count || 0,
+            totalAmount: data.totalAmount || 0,
+            averageAmount: data.averageAmount || 0,
+          });
+        } else {
+          setFormData({
+            transactions: [],
+            count: 0,
+            totalAmount: 0,
+            averageAmount: 0,
+          });
+        }
       } else {
-        console.log("No data found, resetting to empty");
-        setTransactions([]);
-        setNotes("");
+        setFormData({
+          transactions: [],
+          count: 0,
+          totalAmount: 0,
+          averageAmount: 0,
+        });
       }
     } catch (error) {
       console.error("Error fetching data:", error);
-      setTransactions([]);
-      setNotes("");
+      setMessage({
+        type: "error",
+        text: "Failed to fetch data. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const addTransaction = () => {
-    const newTransaction: FailedPaymentTransaction = {
-      id: Date.now().toString(),
-      description: "Failed Payment",
-      date: formatDateString(selectedDate),
-      amount: 0,
-      reason: "",
-    };
-    setTransactions([...transactions, newTransaction]);
-  };
-
-  const updateTransaction = (id: string, field: keyof FailedPaymentTransaction, value: any) => {
-    setTransactions(transactions.map(t => 
-      t.id === id ? { ...t, [field]: value } : t
-    ));
-  };
-
-  const deleteTransaction = (id: string) => {
-    setTransactions(transactions.filter(t => t.id !== id));
-  };
-
-  const calculateStats = () => {
-    const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-    const avgAmount = transactions.length > 0 ? totalAmount / transactions.length : 0;
-    
-    return {
-      count: transactions.length,
-      totalAmount: totalAmount,
-      averageAmount: avgAmount,
-    };
-  };
-
   const handleSave = async () => {
+    if (!username) {
+      setMessage({
+        type: "error",
+        text: "Username is required. Add ?user=username to the URL.",
+      });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     try {
-      const stats = calculateStats();
       const dataToSave = {
-        transactions,
-        ...stats,
-        notes,
-        updatedBy: "Admin",
+        transactions: formData.transactions,
+        count: formData.count,
+        totalAmount: formData.totalAmount,
+        averageAmount: formData.averageAmount,
       };
-      await failedPaymentsCardService.createOrUpdate(selectedDate, dataToSave);
+
+      await homepageService.createOrUpdateCard(
+        username,
+        "Failed Payments Card",
+        selectedDate,
+        dataToSave,
+        "Admin"
+      );
       setMessage({ type: "success", text: "Data saved successfully!" });
     } catch (error) {
-      setMessage({ type: "error", text: "Failed to save data. Please try again." });
+      setMessage({
+        type: "error",
+        text: "Failed to save data. Please try again.",
+      });
       console.error("Error saving data:", error);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this data?")) return;
-    
-    setSaving(true);
-    setMessage(null);
-    try {
-      await failedPaymentsCardService.delete(selectedDate);
-      setMessage({ type: "success", text: "Data deleted successfully!" });
-      fetchData();
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to delete data. Please try again." });
-      console.error("Error deleting data:", error);
-    } finally {
-      setSaving(false);
-    }
+  const addTransaction = () => {
+    setFormData({
+      ...formData,
+      transactions: [
+        ...formData.transactions,
+        {
+          id: `tx_${Date.now()}`,
+          description: "",
+          date: formatDateString(selectedDate),
+          amount: 0,
+          reason: "",
+        },
+      ],
+    });
   };
+
+  const removeTransaction = (index: number) => {
+    setFormData({
+      ...formData,
+      transactions: formData.transactions.filter((_, i) => i !== index),
+    });
+  };
+
+  const updateTransaction = (
+    index: number,
+    field: keyof FailedPaymentTransaction,
+    value: any
+  ) => {
+    const updated = [...formData.transactions];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, transactions: updated });
+  };
+
+  const calculateStats = () => {
+    const count = formData.transactions.length;
+    const totalAmount = formData.transactions.reduce(
+      (sum, t) => sum + t.amount,
+      0
+    );
+    const average = count > 0 ? totalAmount / count : 0;
+
+    setFormData({
+      ...formData,
+      count,
+      totalAmount,
+      averageAmount: average,
+    });
+  };
+
+  useEffect(() => {
+    calculateStats();
+  }, [formData.transactions]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <button
-          onClick={() => navigate("/admin/home")}
-          className="text-sm text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
+          onClick={() => navigate(`/admin/home?user=${username || ""}`)}
+          className="text-sm cursor-pointer text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
         >
           ← Back to Home Management
         </button>
@@ -136,9 +204,19 @@ const EditFailedPaymentsCardPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Edit Failed Payments Card
           </h1>
-          <p className="text-gray-600 mb-6">
-            Manage failed payments data for the home page
+          <p className="text-gray-600 mb-2">
+            Manage failed payments data and statistics
           </p>
+          {username ? (
+            <p className="text-sm text-blue-600 mb-6 font-medium">
+              Managing data for: <span className="font-bold">{username}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-amber-600 mb-6">
+              ⚠️ No username specified. Add ?user=username to the URL to manage
+              a specific user's data.
+            </p>
+          )}
 
           {message && (
             <div
@@ -161,158 +239,172 @@ const EditFailedPaymentsCardPage = () => {
               value={formatDateString(selectedDate)}
               max={formatDateString(new Date())}
               onChange={(e) => {
-                const [year, month, day] = e.target.value.split('-').map(Number);
-                const newDate = new Date(year, month - 1, day, 12, 0, 0, 0);
-                setSelectedDate(newDate);
+                const [year, month, day] = e.target.value
+                  .split("-")
+                  .map(Number);
+                setSelectedDate(new Date(year, month - 1, day));
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading data...</p>
-            </div>
+            <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : (
             <div className="space-y-6">
-              {/* Transaction List */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Count
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.count}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Total Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.totalAmount.toFixed(2)}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Average Amount
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.averageAmount.toFixed(2)}
+                    readOnly
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                  />
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Failed Payment Transactions</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Failed Transactions
+                  </h3>
                   <button
                     onClick={addTransaction}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                   >
-                    + Add Failed Payment
+                    <Plus className="h-4 w-4" />
+                    Add Transaction
                   </button>
                 </div>
 
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {transactions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No failed payments yet. Click "Add Failed Payment" to create one.
-                    </div>
-                  ) : (
-                    transactions.map((transaction) => (
-                      <div key={transaction.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                        <div className="grid grid-cols-12 gap-3 items-start">
-                          <div className="col-span-3">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Description
-                            </label>
-                            <input
-                              type="text"
-                              value={transaction.description}
-                              onChange={(e) => updateTransaction(transaction.id, "description", e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Failed Payment"
-                            />
-                          </div>
-
-                          <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Date
-                            </label>
-                            <input
-                              type="date"
-                              value={transaction.date}
-                              max={formatDateString(new Date())}
-                              onChange={(e) => updateTransaction(transaction.id, "date", e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-
-                          <div className="col-span-2">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Amount ($)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={transaction.amount}
-                              onChange={(e) => updateTransaction(transaction.id, "amount", Number(e.target.value))}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          </div>
-
-                          <div className="col-span-4">
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Failure Reason
-                            </label>
-                            <input
-                              type="text"
-                              value={transaction.reason || ""}
-                              onChange={(e) => updateTransaction(transaction.id, "reason", e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="e.g., Insufficient funds"
-                            />
-                          </div>
-
-                          <div className="col-span-1 flex items-end">
-                            <button
-                              onClick={() => deleteTransaction(transaction.id)}
-                              className="w-full px-2 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                              title="Delete transaction"
-                            >
-                              ×
-                            </button>
-                          </div>
+                <div className="space-y-4">
+                  {formData.transactions.map((transaction, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">
+                          Transaction #{index + 1}
+                        </span>
+                        <button
+                          onClick={() => removeTransaction(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            ID
+                          </label>
+                          <input
+                            type="text"
+                            value={transaction.id}
+                            onChange={(e) =>
+                              updateTransaction(index, "id", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Description
+                          </label>
+                          <input
+                            type="text"
+                            value={transaction.description}
+                            onChange={(e) =>
+                              updateTransaction(
+                                index,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Amount
+                          </label>
+                          <input
+                            type="number"
+                            value={transaction.amount}
+                            onChange={(e) =>
+                              updateTransaction(
+                                index,
+                                "amount",
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Reason
+                          </label>
+                          <input
+                            type="text"
+                            value={transaction.reason || ""}
+                            onChange={(e) =>
+                              updateTransaction(index, "reason", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
                         </div>
                       </div>
-                    ))
+                    </div>
+                  ))}
+                  {formData.transactions.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      No failed transactions. Click "Add Transaction" to add
+                      one.
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Auto-calculated Stats */}
-              {transactions.length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Auto-calculated Statistics</h3>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <span className="block text-xs text-gray-600">Total Failed</span>
-                      <span className="text-lg font-semibold text-red-600">{calculateStats().count}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-600">Total Amount</span>
-                      <span className="text-lg font-semibold text-gray-900">${calculateStats().totalAmount.toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="block text-xs text-gray-600">Avg Amount</span>
-                      <span className="text-lg font-semibold text-gray-900">${calculateStats().averageAmount.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add any notes about this data..."
-                />
-              </div>
-
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4">
                 <button
                   onClick={handleSave}
-                  disabled={saving}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+                  disabled={saving || !username}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button
-                  onClick={handleDelete}
-                  disabled={saving}
-                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+                  onClick={() => navigate(`/admin/home?user=${username || ""}`)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                 >
-                  Delete
+                  Cancel
                 </button>
               </div>
             </div>

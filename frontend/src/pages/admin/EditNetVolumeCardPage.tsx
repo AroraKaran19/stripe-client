@@ -1,301 +1,316 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { netVolumeCardService } from "../../services/net-volume-card.service";
-import type { NetVolumeCardData, TimeSeriesData } from "../../services/net-volume-card.service";
+import { useUserFromRoute } from "../../hooks/useUserFromRoute";
+import { homepageService } from "../../services/homepage.service";
 
-interface DailyValue {
-  date: string;
+type EntryMethod = "daily" | "hourly";
+
+interface HourlyData {
+  hour: number;
   value: number;
 }
 
 const EditNetVolumeCardPage = () => {
   const navigate = useNavigate();
-  
-  // Date mode: single day or date range
-  const [dateMode, setDateMode] = useState<"single" | "range">("single");
+  const { username } = useUserFromRoute();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
-  
-  // Input mode: total or hourly (for single day), total or daily (for date range)
-  const [inputMode, setInputMode] = useState<"total" | "hourly" | "daily">("total");
-  
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  
-  // Form data
-  const [totalValue, setTotalValue] = useState(0);
-  const [hourlyValues, setHourlyValues] = useState<number[]>(Array(24).fill(0));
-  const [dailyValues, setDailyValues] = useState<DailyValue[]>([]);
-  const [notes, setNotes] = useState("");
-  
-  const [expandedHourly, setExpandedHourly] = useState(false);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [entryMethod, setEntryMethod] = useState<EntryMethod>("daily");
 
-  // Calculate days in range
-  const getDaysInRange = () => {
-    if (dateMode === "single") return 1;
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
-  };
+  const [formData, setFormData] = useState({
+    dailyTotal: 0,
+    change: 0,
+    changePercent: 0,
+    hourlyData: Array.from({ length: 24 }, (_, i) => ({
+      hour: i,
+      value: 0,
+    })) as HourlyData[],
+  });
 
-  // Helper to format date as YYYY-MM-DD without timezone issues
+  // Store previous day's data (read-only, auto-fetched)
+  const [previousDayData, setPreviousDayData] = useState<{
+    dailyTotal: number;
+    hourlyData: HourlyData[];
+  } | null>(null);
+
   const formatDateString = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
-  // Initialize daily values when date range changes
   useEffect(() => {
-    if (dateMode === "range") {
-      const days = getDaysInRange();
-      const newDailyValues: DailyValue[] = [];
-      
-      for (let i = 0; i < days; i++) {
-        const date = new Date(startDate);
-        date.setDate(date.getDate() + i);
-        const dateStr = formatDateString(date);
-        
-        // Keep existing value if it exists
-        const existing = dailyValues.find(d => d.date === dateStr);
-        newDailyValues.push({
-          date: dateStr,
-          value: existing?.value || 0
-        });
-      }
-      
-      setDailyValues(newDailyValues);
-    }
-  }, [dateMode, startDate, endDate]);
-
-  // Fetch data for single day
-  useEffect(() => {
-    if (dateMode === "single") {
+    if (username) {
       fetchData();
     }
-  }, [selectedDate, dateMode]);
+  }, [selectedDate, username]);
+
+  // Sync data when switching between entry methods
+  const prevEntryMethodRef = useRef<EntryMethod | null>(null);
+  useEffect(() => {
+    // Skip on initial mount
+    if (prevEntryMethodRef.current === null) {
+      prevEntryMethodRef.current = entryMethod;
+      return;
+    }
+
+    // Only convert if entry method actually changed
+    if (prevEntryMethodRef.current !== entryMethod) {
+      if (entryMethod === "hourly") {
+        // Switching to hourly: divide daily total equally across 24 hours
+        setFormData((prev) => {
+          if (prev.dailyTotal > 0) {
+            const hourlyValue = prev.dailyTotal / 24;
+            return {
+              ...prev,
+              hourlyData: Array.from({ length: 24 }, (_, i) => ({
+                hour: i,
+                value: hourlyValue,
+              })),
+            };
+          }
+          return prev;
+        });
+      } else if (entryMethod === "daily") {
+        // Switching to daily: calculate total from hourly data
+        setFormData((prev) => {
+          const total = prev.hourlyData.reduce((sum, h) => sum + h.value, 0);
+          if (total > 0 || prev.dailyTotal === 0) {
+            return {
+              ...prev,
+              dailyTotal: total,
+            };
+          }
+          return prev;
+        });
+      }
+      prevEntryMethodRef.current = entryMethod;
+    }
+  }, [entryMethod]);
 
   const fetchData = async () => {
+    if (!username) {
+      setMessage({
+        type: "error",
+        text: "Username is required. Add ?user=username to the URL.",
+      });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
     try {
-      const response = await netVolumeCardService.getByDate(selectedDate);
-      
-      if (response.data && !Array.isArray(response.data)) {
-        const data = response.data as NetVolumeCardData;
-        
-        // Extract hourly values from timeSeries
-        const newHourlyValues = Array(24).fill(0);
-        if (data.timeSeries && data.timeSeries.length > 0) {
-          data.timeSeries.forEach(ts => {
-            const date = new Date(ts.timestamp);
-            const hour = date.getUTCHours();
-            if (hour >= 0 && hour < 24) {
-              newHourlyValues[hour] = ts.value || 0;
-            }
+      // Calculate previous date
+      const previousDate = new Date(selectedDate);
+      previousDate.setDate(previousDate.getDate() - 1);
+
+      // Fetch current day and previous day data
+      const [currentRes, previousRes] = await Promise.allSettled([
+        homepageService.getCard(username, "Net Volume Card", selectedDate),
+        homepageService.getCard(username, "Net Volume Card", previousDate),
+      ]);
+
+      // Process current day data
+      if (
+        currentRes.status === "fulfilled" &&
+        currentRes.value.data &&
+        !Array.isArray(currentRes.value.data)
+      ) {
+        const entry = currentRes.value.data as any;
+        const data = entry.data;
+
+        if (data) {
+          // If we have timeSeries, extract hourly data
+          let hourlyData: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            value: 0,
+          }));
+
+          if (data.timeSeries && data.timeSeries.length > 0) {
+            data.timeSeries.forEach((ts: any) => {
+              const hour = new Date(ts.timestamp).getUTCHours();
+              hourlyData[hour] = { hour, value: ts.value || 0 };
+            });
+          }
+
+          // Calculate daily total from hourly data or use value
+          const dailyTotal =
+            data.value || hourlyData.reduce((sum, h) => sum + h.value, 0);
+
+          setFormData({
+            dailyTotal,
+            change: data.change || 0,
+            changePercent: data.changePercent || 0,
+            hourlyData,
+          });
+        } else {
+          setFormData({
+            dailyTotal: 0,
+            change: 0,
+            changePercent: 0,
+            hourlyData: Array.from({ length: 24 }, (_, i) => ({
+              hour: i,
+              value: 0,
+            })),
           });
         }
-        
-        setTotalValue(data.value || 0);
-        setHourlyValues(newHourlyValues);
-        setNotes(data.notes || "");
       } else {
-        setTotalValue(0);
-        setHourlyValues(Array(24).fill(0));
-        setNotes("");
+        setFormData({
+          dailyTotal: 0,
+          change: 0,
+          changePercent: 0,
+          hourlyData: Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            value: 0,
+          })),
+        });
+      }
+
+      // Process previous day data
+      if (
+        previousRes.status === "fulfilled" &&
+        previousRes.value.data &&
+        !Array.isArray(previousRes.value.data)
+      ) {
+        const entry = previousRes.value.data as any;
+        const data = entry.data;
+
+        if (data) {
+          let hourlyData: HourlyData[] = Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            value: 0,
+          }));
+
+          if (data.timeSeries && data.timeSeries.length > 0) {
+            data.timeSeries.forEach((ts: any) => {
+              const hour = new Date(ts.timestamp).getUTCHours();
+              hourlyData[hour] = { hour, value: ts.value || 0 };
+            });
+          }
+
+          const dailyTotal =
+            data.value || hourlyData.reduce((sum, h) => sum + h.value, 0);
+
+          setPreviousDayData({
+            dailyTotal,
+            hourlyData,
+          });
+        } else {
+          setPreviousDayData({
+            dailyTotal: 0,
+            hourlyData: Array.from({ length: 24 }, (_, i) => ({
+              hour: i,
+              value: 0,
+            })),
+          });
+        }
+      } else {
+        setPreviousDayData({
+          dailyTotal: 0,
+          hourlyData: Array.from({ length: 24 }, (_, i) => ({
+            hour: i,
+            value: 0,
+          })),
+        });
       }
     } catch (error) {
       console.error("Error fetching data:", error);
+      setMessage({
+        type: "error",
+        text: "Failed to fetch data. Please try again.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // SINGLE DAY - TOTAL MODE: Distribute total across 24 hours
-  const handleTotalValueChange = (value: number) => {
-    setTotalValue(value);
-    
-    if (dateMode === "single") {
-      // Divide equally across 24 hours
-      const valuePerHour = value / 24;
-      const newHourlyValues = Array(24).fill(valuePerHour);
-      setHourlyValues(newHourlyValues);
-    }
-  };
-
-  // SINGLE DAY - HOURLY MODE: Update individual hour
-  const handleHourlyValueChange = (hour: number, value: number) => {
-    const newHourlyValues = [...hourlyValues];
-    newHourlyValues[hour] = value;
-    setHourlyValues(newHourlyValues);
-    
-    // Recalculate total
-    const newTotal = newHourlyValues.reduce((sum, val) => sum + val, 0);
-    setTotalValue(newTotal);
-  };
-
-  // DATE RANGE - TOTAL MODE: Distribute total across all days, then hours
-  const handleRangeTotalValueChange = (value: number) => {
-    setTotalValue(value);
-    
-    const days = getDaysInRange();
-    const valuePerDay = value / days;
-    
-    const newDailyValues = dailyValues.map(d => ({
-      ...d,
-      value: valuePerDay
-    }));
-    
-    setDailyValues(newDailyValues);
-  };
-
-  // DATE RANGE - DAILY MODE: Update individual day
-  const handleDailyValueChange = (date: string, value: number) => {
-    const newDailyValues = dailyValues.map(d =>
-      d.date === date ? { ...d, value } : d
-    );
-    setDailyValues(newDailyValues);
-    
-    // Recalculate total
-    const newTotal = newDailyValues.reduce((sum, d) => sum + d.value, 0);
-    setTotalValue(newTotal);
-  };
-
-  // Create timeSeries for a single day
-  // Takes a date string in YYYY-MM-DD format to avoid any timezone confusion
-  const createTimeSeriesForDay = (date: Date, dayValue: number, hourlyDistribution?: number[]): TimeSeriesData[] => {
-    const timeSeries: TimeSeriesData[] = [];
-    
-    // Use provided hourly distribution or divide equally
-    const values = hourlyDistribution || Array(24).fill(dayValue / 24);
-    
-    // Get the date string in YYYY-MM-DD format
-    const dateStr = formatDateString(date);
-    
-    // Create UTC timestamps for each hour of the selected date
-    for (let hour = 0; hour < 24; hour++) {
-      // Create timestamp: YYYY-MM-DD HH:00:00 UTC
-      const timestamp = new Date(`${dateStr}T${String(hour).padStart(2, '0')}:00:00.000Z`);
-      
-      timeSeries.push({
-        timestamp,
-        value: values[hour]
-      });
-    }
-    
-    return timeSeries;
-  };
-
   const handleSave = async () => {
+    if (!username) {
+      setMessage({
+        type: "error",
+        text: "Username is required. Add ?user=username to the URL.",
+      });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
-    
     try {
-      if (dateMode === "single") {
-        // SINGLE DAY MODE
-        const timeSeries = createTimeSeriesForDay(selectedDate, totalValue, hourlyValues);
-        
-        const dataToSave = {
-          value: totalValue,
-          change: 0,
-          changePercent: 0,
-          timeSeries,
-          notes,
-          updatedBy: "Admin",
-        };
-        
-        await netVolumeCardService.createOrUpdate(selectedDate, dataToSave);
-        setMessage({ type: "success", text: "Data saved successfully!" });
-        
+      // Calculate values
+      const dailyTotal =
+        entryMethod === "daily"
+          ? formData.dailyTotal
+          : formData.hourlyData.reduce((sum, h) => sum + h.value, 0);
+
+      const previousTotal = previousDayData?.dailyTotal || 0;
+      const change = dailyTotal - previousTotal;
+      let changePercent = 0;
+      if (previousTotal === 0) {
+        // If previous is 0 and current > 0, set to 100%, otherwise 0%
+        changePercent = dailyTotal > 0 ? 100 : 0;
       } else {
-        // DATE RANGE MODE
-        const savePromises = dailyValues.map(async (dayData) => {
-          const date = new Date(dayData.date);
-          
-          // Create timeSeries for this day (divide day value across 24 hours)
-          const timeSeries = createTimeSeriesForDay(date, dayData.value);
-          
-          const dataToSave = {
-            value: dayData.value,
-            change: 0,
-            changePercent: 0,
-            timeSeries,
-            notes,
-            updatedBy: "Admin",
-          };
-          
-          return netVolumeCardService.createOrUpdate(date, dataToSave);
-        });
-        
-        await Promise.all(savePromises);
-        setMessage({ 
-          type: "success", 
-          text: `Data saved successfully for ${dailyValues.length} days!` 
-        });
+        changePercent = (change / previousTotal) * 100;
+        // Cap at 100% maximum
+        changePercent = Math.min(Math.abs(changePercent), 100);
       }
+
+      // Build timeSeries from hourly data
+      const timeSeries = formData.hourlyData.map((h) => {
+        const timestamp = new Date(
+          Date.UTC(
+            selectedDate.getFullYear(),
+            selectedDate.getMonth(),
+            selectedDate.getDate(),
+            h.hour,
+            0,
+            0,
+            0
+          )
+        );
+        return {
+          timestamp: timestamp.toISOString(),
+          value: entryMethod === "daily" ? dailyTotal / 24 : h.value,
+        };
+      });
+
+      const dataToSave = {
+        value: dailyTotal,
+        change,
+        changePercent,
+        timeSeries,
+      };
+
+      await homepageService.createOrUpdateCard(
+        username,
+        "Net Volume Card",
+        selectedDate,
+        dataToSave,
+        "Admin"
+      );
+      setMessage({ type: "success", text: "Data saved successfully!" });
     } catch (error) {
-      setMessage({ type: "error", text: "Failed to save data. Please try again." });
+      setMessage({
+        type: "error",
+        text: "Failed to save data. Please try again.",
+      });
       console.error("Error saving data:", error);
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this data?")) return;
-    
-    setSaving(true);
-    setMessage(null);
-    
-    try {
-      if (dateMode === "single") {
-        await netVolumeCardService.delete(selectedDate);
-        setMessage({ type: "success", text: "Data deleted successfully!" });
-        fetchData();
-      } else {
-        const deletePromises = dailyValues.map(dayData => 
-          netVolumeCardService.delete(new Date(dayData.date))
-        );
-        await Promise.all(deletePromises);
-        setMessage({ type: "success", text: `Data deleted for ${dailyValues.length} days!` });
-      }
-    } catch (error) {
-      setMessage({ type: "error", text: "Failed to delete data. Please try again." });
-      console.error("Error deleting data:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Get input mode options based on date mode
-  const getInputModeOptions = () => {
-    if (dateMode === "single") {
-      return [
-        { value: "total", label: "Total Value (Auto-distribute to hours)" },
-        { value: "hourly", label: "Hourly Values (Manual)" }
-      ];
-    } else {
-      return [
-        { value: "total", label: "Total Value (Auto-distribute to days & hours)" },
-        { value: "daily", label: "Daily Values (Manual per day)" }
-      ];
-    }
-  };
-
-  // Reset input mode when date mode changes
-  useEffect(() => {
-    setInputMode("total");
-  }, [dateMode]);
-
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-6xl mx-auto">
         <button
-          onClick={() => navigate("/admin/home")}
-          className="text-sm text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
+          onClick={() => navigate(`/admin/home?user=${username || ""}`)}
+          className="text-sm cursor-pointer text-gray-600 hover:text-gray-900 mb-4 flex items-center gap-2"
         >
           ← Back to Home Management
         </button>
@@ -304,9 +319,19 @@ const EditNetVolumeCardPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Edit Net Volume Card
           </h1>
-          <p className="text-gray-600 mb-6">
-            Manage net volume metrics for the home page
+          <p className="text-gray-600 mb-2">
+            Manage net volume metrics and trends
           </p>
+          {username ? (
+            <p className="text-sm text-blue-600 mb-6 font-medium">
+              Managing data for: <span className="font-bold">{username}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-amber-600 mb-6">
+              ⚠️ No username specified. Add ?user=username to the URL to manage
+              a specific user's data.
+            </p>
+          )}
 
           {message && (
             <div
@@ -320,289 +345,216 @@ const EditNetVolumeCardPage = () => {
             </div>
           )}
 
-          {/* STEP 1: Date Mode Selection */}
-          <div className="mb-6 bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Step 1: Choose Date Mode
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Date
             </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDateMode("single")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  dateMode === "single"
-                    ? "bg-purple-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
-                }`}
-              >
-                📅 Single Day
-              </button>
-              <button
-                onClick={() => setDateMode("range")}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  dateMode === "range"
-                    ? "bg-purple-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
-                }`}
-              >
-                📆 Date Range
-              </button>
-            </div>
+            <input
+              type="date"
+              value={formatDateString(selectedDate)}
+              max={formatDateString(new Date())}
+              onChange={(e) => {
+                const [year, month, day] = e.target.value
+                  .split("-")
+                  .map(Number);
+                setSelectedDate(new Date(year, month - 1, day));
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
-          {/* STEP 2: Date Selection */}
-          <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Step 2: Select Date{dateMode === "range" ? " Range" : ""}
-            </label>
-            
-            {dateMode === "single" ? (
-              <input
-                type="date"
-                value={formatDateString(selectedDate)}
-                max={formatDateString(new Date())}
-                onChange={(e) => {
-                  const [year, month, day] = e.target.value.split('-').map(Number);
-                  setSelectedDate(new Date(year, month - 1, day));
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateString(startDate)}
-                    max={formatDateString(new Date())}
-                    onChange={(e) => {
-                      const [year, month, day] = e.target.value.split('-').map(Number);
-                      setStartDate(new Date(year, month - 1, day));
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formatDateString(endDate)}
-                    max={formatDateString(new Date())}
-                    min={formatDateString(startDate)}
-                    onChange={(e) => {
-                      const [year, month, day] = e.target.value.split('-').map(Number);
-                      setEndDate(new Date(year, month - 1, day));
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div className="col-span-2 text-sm text-blue-700 bg-blue-100 p-3 rounded">
-                  📊 Selected: <strong>{getDaysInRange()} days</strong>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* STEP 3: Input Mode Selection */}
-          <div className="mb-6 bg-green-50 p-4 rounded-lg border border-green-200">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Step 3: Choose Input Mode
-            </label>
-            <div className="flex gap-2">
-              {getInputModeOptions().map(option => (
-                <button
-                  key={option.value}
-                  onClick={() => setInputMode(option.value as any)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    inputMode === option.value
-                      ? "bg-green-600 text-white"
-                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-300"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            
-            {/* Explanation */}
-            <div className="mt-3 text-xs text-gray-600 bg-white p-3 rounded border border-green-200">
-              {dateMode === "single" && inputMode === "total" && (
-                <p>💡 Enter total value → Will be divided equally across 24 hours</p>
-              )}
-              {dateMode === "single" && inputMode === "hourly" && (
-                <p>💡 Enter value for each hour manually (00:00 - 23:00)</p>
-              )}
-              {dateMode === "range" && inputMode === "total" && (
-                <p>💡 Enter total value → Will be divided across {getDaysInRange()} days → Each day divided across 24 hours</p>
-              )}
-              {dateMode === "range" && inputMode === "daily" && (
-                <p>💡 Enter value for each day manually → Each day's value will be divided across 24 hours</p>
-              )}
-            </div>
-          </div>
-
-          {/* STEP 4: Value Input */}
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading data...</p>
-            </div>
+            <div className="text-center py-8 text-gray-500">Loading...</div>
           ) : (
             <div className="space-y-6">
-              {/* SINGLE DAY - TOTAL MODE */}
-              {dateMode === "single" && inputMode === "total" && (
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Value ($)
+              {/* Entry Method Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Entry Method
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="entryMethod"
+                      value="daily"
+                      checked={entryMethod === "daily"}
+                      onChange={(e) =>
+                        setEntryMethod(e.target.value as EntryMethod)
+                      }
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Daily Totals</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={totalValue}
-                    onChange={(e) => handleTotalValueChange(Number(e.target.value))}
-                    className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter total value"
-                  />
-                  <p className="text-sm text-gray-600 mt-2">
-                    📊 Per hour: <strong>${(totalValue / 24).toFixed(2)}</strong>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="entryMethod"
+                      value="hourly"
+                      checked={entryMethod === "hourly"}
+                      onChange={(e) =>
+                        setEntryMethod(e.target.value as EntryMethod)
+                      }
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Hourly Breakdown
+                    </span>
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {entryMethod === "daily"
+                    ? "Enter daily totals. They will be divided equally into 24 hours for the graph."
+                    : "Enter individual values for each hour (00:00 to 23:00)."}
+                </p>
+              </div>
+
+              {/* Previous Day Data (Read-only) */}
+              {previousDayData && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                    Previous Day (
+                    {formatDateString(
+                      new Date(
+                        new Date(selectedDate).setDate(
+                          selectedDate.getDate() - 1
+                        )
+                      )
+                    )}
+                    )
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Total: US${previousDayData.dailyTotal.toFixed(2)} (used for
+                    comparison)
                   </p>
                 </div>
               )}
 
-              {/* SINGLE DAY - HOURLY MODE */}
-              {dateMode === "single" && inputMode === "hourly" && (
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Total (Calculated)
-                      </label>
-                      <div className="text-2xl font-bold text-gray-900">
-                        ${totalValue.toFixed(2)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setExpandedHourly(!expandedHourly)}
-                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      {expandedHourly ? "Hide Hours" : "Show All Hours"}
-                    </button>
-                  </div>
-
-                  {expandedHourly && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-96 overflow-y-auto">
-                      {hourlyValues.map((value, hour) => (
-                        <div key={hour} className="bg-white p-2 rounded border border-gray-200">
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            {hour.toString().padStart(2, "0")}:00
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={value}
-                            onChange={(e) => handleHourlyValueChange(hour, Number(e.target.value))}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* DATE RANGE - TOTAL MODE */}
-              {dateMode === "range" && inputMode === "total" && (
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+              {/* Daily Total Input */}
+              {entryMethod === "daily" && (
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Total Value for Entire Range ($)
+                    Daily Total
                   </label>
                   <input
                     type="number"
                     step="0.01"
-                    value={totalValue}
-                    onChange={(e) => handleRangeTotalValueChange(Number(e.target.value))}
-                    className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter total value for entire range"
+                    value={formData.dailyTotal}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        dailyTotal: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   />
-                  <div className="mt-3 text-sm text-gray-600 space-y-1">
-                    <p>📊 Per day: <strong>${(totalValue / getDaysInRange()).toFixed(2)}</strong></p>
-                    <p>⏰ Per hour (per day): <strong>${(totalValue / getDaysInRange() / 24).toFixed(2)}</strong></p>
-                  </div>
                 </div>
               )}
 
-              {/* DATE RANGE - DAILY MODE */}
-              {dateMode === "range" && inputMode === "daily" && (
-                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Total (Calculated)
-                    </label>
-                    <div className="text-2xl font-bold text-gray-900">
-                      ${totalValue.toFixed(2)}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Enter value for each day:</p>
-                    {dailyValues.map((dayData) => (
-                      <div key={dayData.date} className="flex items-center gap-3 bg-white p-3 rounded border border-gray-200">
-                        <label className="text-sm font-medium text-gray-700 w-32">
-                          {new Date(dayData.date + 'T00:00:00').toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
+              {/* Hourly Breakdown Input */}
+              {entryMethod === "hourly" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Hourly Breakdown (24 hours)
+                  </label>
+                  <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                    {formData.hourlyData.map((hourData, index) => (
+                      <div key={index} className="flex flex-col">
+                        <label className="text-xs text-gray-600 mb-1">
+                          {String(index).padStart(2, "0")}:00
                         </label>
                         <input
                           type="number"
                           step="0.01"
-                          value={dayData.value}
-                          onChange={(e) => handleDailyValueChange(dayData.date, Number(e.target.value))}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-                          placeholder="0.00"
+                          value={hourData.value}
+                          onChange={(e) => {
+                            const newHourlyData = [...formData.hourlyData];
+                            newHourlyData[index] = {
+                              ...newHourlyData[index],
+                              value: parseFloat(e.target.value) || 0,
+                            };
+                            setFormData({
+                              ...formData,
+                              hourlyData: newHourlyData,
+                            });
+                          }}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                         />
-                        <span className="text-xs text-gray-500 w-24">
-                          ${(dayData.value / 24).toFixed(2)}/hr
-                        </span>
                       </div>
                     ))}
                   </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Total: US$
+                    {formData.hourlyData
+                      .reduce((sum, h) => sum + h.value, 0)
+                      .toFixed(2)}
+                  </p>
                 </div>
               )}
 
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Add any notes about this data..."
-                />
+              {/* Calculated Values (Read-only) */}
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Calculated Values (Auto-calculated from previous day)
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-600">Change</label>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {(
+                        (entryMethod === "daily"
+                          ? formData.dailyTotal
+                          : formData.hourlyData.reduce(
+                              (sum, h) => sum + h.value,
+                              0
+                            )) - (previousDayData?.dailyTotal || 0)
+                      ).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">
+                      Change Percent
+                    </label>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {(() => {
+                        const currentTotal =
+                          entryMethod === "daily"
+                            ? formData.dailyTotal
+                            : formData.hourlyData.reduce(
+                                (sum, h) => sum + h.value,
+                                0
+                              );
+                        const previousTotal = previousDayData?.dailyTotal || 0;
+                        if (previousTotal === 0) {
+                          return currentTotal > 0 ? "100.00" : "0.00";
+                        }
+                        const changePercent =
+                          ((currentTotal - previousTotal) / previousTotal) *
+                          100;
+                        // Cap at 100% maximum
+                        return Math.min(Math.abs(changePercent), 100).toFixed(
+                          2
+                        );
+                      })()}
+                      %
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4">
                 <button
                   onClick={handleSave}
-                  disabled={saving}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+                  disabled={saving || !username}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? "Saving..." : "💾 Save Changes"}
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button
-                  onClick={handleDelete}
-                  disabled={saving}
-                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium transition-colors"
+                  onClick={() => navigate(`/admin/home?user=${username || ""}`)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                 >
-                  🗑️ Delete
+                  Cancel
                 </button>
               </div>
             </div>

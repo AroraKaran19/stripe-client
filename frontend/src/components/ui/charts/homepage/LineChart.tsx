@@ -140,24 +140,6 @@ const LineChart = ({ currentData, previousData, currency = "US$", showPrevious =
   const dataForLabels = currentData.length > 0 ? currentData : previousData;
   const labels = generateLabels(dataForLabels);
   
-  // Debug: Log data length for hourly charts
-  if (isHourly) {
-    console.log("LineChart - Hourly data:", {
-      currentDataLength: currentData.length,
-      previousDataLength: previousData.length,
-      labelsLength: labels.length,
-      firstLabel: labels[0],
-      lastLabel: labels[labels.length - 1],
-      allLabels: labels,
-      sampleCurrentData: currentData.slice(0, 5),
-      sampleCurrentValues: currentData.slice(0, 5).map(d => d.value)
-    });
-    
-    if (currentData.length !== 24) {
-      console.warn("⚠️ Expected 24 data points for hourly chart, got:", currentData.length);
-    }
-  }
-  
   // Format date range for display
   // Use UTC date methods to avoid timezone conversion issues
   const formatDateLabel = (date: Date): string => {
