@@ -19,17 +19,15 @@ import SidebarLink from "./components/SidebarLink";
 import { useState } from "react";
 import { cn } from "../../../utils";
 import { useSidebar } from "../../../context/SidebarContext";
+import { useBusiness } from "../../../context/BusinessContext";
 
 const Sidebar = () => {
   const location = useLocation().pathname;
   const { isCollapsed, isHovering } = useSidebar();
 
-  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const { businessName, isLoading } = useBusiness();
 
-  const user = {
-    name: "Visualize & Build ltd.",
-    email: "visualizeandbuild@gmail.com",
-  };
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const menuLinks: MenuLink[] = [
     {
@@ -238,7 +236,7 @@ const Sidebar = () => {
       )}
     >
       <div className="account-wrapper mx-5 h-15 flex items-center relative shrink-0">
-        <AccountManager user={user} />
+        <AccountManager name={businessName} isLoading={isLoading} />
       </div>
       <nav className="sidebar-menu p-5 pb-0 w-full h-full flex flex-col gap-7">
         <ul className="sidebar-main-list relative">

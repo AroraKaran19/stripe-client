@@ -2,10 +2,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { LayoutDashboard, CreditCard, ArrowRight } from "lucide-react";
 import { cn } from "../../utils";
+import { useBusiness } from "../../context/BusinessContext";
 
 const AdminIndexPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { businessName } = useBusiness();
 
   const cards = [
     {
@@ -33,7 +35,7 @@ const AdminIndexPage = () => {
   return (
     <>
       <Helmet>
-        <title>Admin Dashboard | Visualize & Build ltd. - Stripe</title>
+        <title>{`Admin Dashboard | ${businessName} - Stripe`}</title>
         <meta
           name="description"
           content="Administrative dashboard for managing transactions, homepage content, and system settings."

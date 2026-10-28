@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "../../utils";
 import { transactionService } from "../../services/transaction.service";
 import type { Transaction } from "../../types/transaction";
+import { useBusiness } from "../../context/BusinessContext";
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ const CreateTransactionModal = ({
   isCreating,
   setIsCreating,
 }: CreateTransactionModalProps) => {
+  const { businessName } = useBusiness();
+  const appliedDescriptor = useRef(businessName);
   const [formData, setFormData] = useState<Partial<Transaction>>({
     amount: 0,
     currency: "USD",
@@ -35,7 +38,7 @@ const CreateTransactionModal = ({
     status: "succeeded",
     payment_id: "",
     description: "",
-    statement_descriptor: "Visualize & Build ltd.",
+    statement_descriptor: businessName,
     country: "",
     payment_method: {
       card_type: "Visa",
@@ -48,6 +51,18 @@ const CreateTransactionModal = ({
     activity_history: [],
     items: [],
   });
+
+  // Keep the descriptor in sync with the business name unless the admin typed their own
+  useEffect(() => {
+    const previous = appliedDescriptor.current;
+    if (previous === businessName) return;
+    appliedDescriptor.current = businessName;
+    setFormData((prev) =>
+      prev.statement_descriptor === previous
+        ? { ...prev, statement_descriptor: businessName }
+        : prev
+    );
+  }, [businessName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +107,7 @@ const CreateTransactionModal = ({
         status: "succeeded",
         payment_id: "",
         description: "",
-        statement_descriptor: "Visualize & Build ltd.",
+        statement_descriptor: businessName,
         country: "",
         payment_method: {
           card_type: "Visa",

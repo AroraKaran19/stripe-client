@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { DEFAULT_BUSINESS_NAME } from "./homepage.model";
 
 // Nested schemas
 const ActivityHistorySchema = new Schema(
@@ -117,7 +118,7 @@ const TransactionSchema = new Schema(
     },
     statement_descriptor: {
       type: String,
-      default: "Visualize & Build ltd.",
+      default: DEFAULT_BUSINESS_NAME,
     },
     customer_id: {
       type: String,

@@ -14,38 +14,41 @@ import EditFailedPaymentsCardPage from "../pages/admin/EditFailedPaymentsCardPag
 import EditNewCustomersCardPage from "../pages/admin/EditNewCustomersCardPage";
 import EditTopCustomersCardPage from "../pages/admin/EditTopCustomersCardPage";
 import NotFoundPage from "../pages/404/NotFoundPage";
+import { BusinessProvider } from "../context/BusinessContext";
 
 const AppRouter = () => {
   return (
     <Router>
-      <Layout>
-        <Routes>
-          {/* Username-based homepage routes */}
-          <Route path="/" element={<Homepage />} />
-          <Route path="/:username" element={<Homepage />} />
-          
-          {/* Other routes */}
-          <Route path="/transactions" element={<TransactionPage />} />
-          <Route
-            path="/transactions/:id"
-            element={<IndividualTransactionsPage />}
-          />
-          <Route path="/admin" element={<AdminIndexPage />} />
-          <Route
-            path="/admin/transactions"
-            element={<AdminTransactionManagementPage />}
-          />
-          <Route path="/admin/home" element={<HomeManagementPage />} />
-          <Route path="/admin/home/top-section" element={<EditTopSectionPage />} />
-          <Route path="/admin/home/payments" element={<EditPaymentsCardPage />} />
-          <Route path="/admin/home/gross-volume" element={<EditGrossVolumeCardPage />} />
-          <Route path="/admin/home/net-volume" element={<EditNetVolumeCardPage />} />
-          <Route path="/admin/home/failed-payments" element={<EditFailedPaymentsCardPage />} />
-          <Route path="/admin/home/new-customers" element={<EditNewCustomersCardPage />} />
-          <Route path="/admin/home/top-customers" element={<EditTopCustomersCardPage />} />
-          <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </Layout>
+      <BusinessProvider>
+        <Layout>
+          <Routes>
+            {/* Username-based homepage routes */}
+            <Route path="/" element={<Homepage />} />
+            <Route path="/:username" element={<Homepage />} />
+
+            {/* Other routes */}
+            <Route path="/transactions" element={<TransactionPage />} />
+            <Route
+              path="/transactions/:id"
+              element={<IndividualTransactionsPage />}
+            />
+            <Route path="/admin" element={<AdminIndexPage />} />
+            <Route
+              path="/admin/transactions"
+              element={<AdminTransactionManagementPage />}
+            />
+            <Route path="/admin/home" element={<HomeManagementPage />} />
+            <Route path="/admin/home/top-section" element={<EditTopSectionPage />} />
+            <Route path="/admin/home/payments" element={<EditPaymentsCardPage />} />
+            <Route path="/admin/home/gross-volume" element={<EditGrossVolumeCardPage />} />
+            <Route path="/admin/home/net-volume" element={<EditNetVolumeCardPage />} />
+            <Route path="/admin/home/failed-payments" element={<EditFailedPaymentsCardPage />} />
+            <Route path="/admin/home/new-customers" element={<EditNewCustomersCardPage />} />
+            <Route path="/admin/home/top-customers" element={<EditTopCustomersCardPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Layout>
+      </BusinessProvider>
     </Router>
   );
 };

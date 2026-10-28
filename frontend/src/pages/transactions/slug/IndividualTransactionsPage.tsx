@@ -11,10 +11,12 @@ import { ClipboardCopy, Edit2 } from "lucide-react";
 import VisaIcon from "../../../assets/transaction/VisaIcon";
 import { transactionService } from "../../../services/transaction.service";
 import type { Transaction } from "../../../types/transaction";
+import { useBusiness } from "../../../context/BusinessContext";
 
 const IndividualTransactionsPage = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const { businessName } = useBusiness();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,8 +68,8 @@ const IndividualTransactionsPage = () => {
           {transaction
             ? `Transaction ${
                 transaction.payment_id || transaction._id
-              } | Visualize & Build ltd. - Stripe`
-            : "Transaction | Visualize & Build ltd. - Stripe"}
+              } | ${businessName} - Stripe`
+            : `Transaction | ${businessName} - Stripe`}
         </title>
         <meta
           name="description"
@@ -95,8 +97,8 @@ const IndividualTransactionsPage = () => {
             transaction
               ? `Transaction ${
                   transaction.payment_id || transaction._id
-                } | Visualize & Build ltd. - Stripe`
-              : "Transaction | Visualize & Build ltd. - Stripe"
+                } | ${businessName} - Stripe`
+              : `Transaction | ${businessName} - Stripe`
           }
         />
         <meta
@@ -117,7 +119,7 @@ const IndividualTransactionsPage = () => {
           }
         />
         <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
-        <meta property="og:site_name" content="Visualize & Build ltd." />
+        <meta property="og:site_name" content={businessName} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
@@ -127,8 +129,8 @@ const IndividualTransactionsPage = () => {
             transaction
               ? `Transaction ${
                   transaction.payment_id || transaction._id
-                } | Visualize & Build ltd. - Stripe`
-              : "Transaction | Visualize & Build ltd. - Stripe"
+                } | ${businessName} - Stripe`
+              : `Transaction | ${businessName} - Stripe`
           }
         />
         <meta
@@ -154,7 +156,7 @@ const IndividualTransactionsPage = () => {
           name="keywords"
           content="transaction details, payment information, transaction history, payment status, transaction management"
         />
-        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="author" content={businessName} />
         <meta name="robots" content="index, follow" />
       </Helmet>
       <div className="py-4 w-full flex flex-col">

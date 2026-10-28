@@ -1,15 +1,18 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Home, ArrowLeft, AlertCircle } from "lucide-react";
+import { useBusiness } from "../../context/BusinessContext";
 
 const NotFoundPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { businessName } = useBusiness();
+  const pageTitle = `404 - Page Not Found | ${businessName} - Stripe`;
 
   return (
     <>
       <Helmet>
-        <title>404 - Page Not Found | Visualize & Build ltd. - Stripe</title>
+        <title>{pageTitle}</title>
         <meta
           name="description"
           content="The page you are looking for could not be found. Return to the dashboard or navigate to another section."
@@ -19,7 +22,7 @@ const NotFoundPage = () => {
         <meta property="og:type" content="website" />
         <meta
           property="og:title"
-          content="404 - Page Not Found | Visualize & Build ltd. - Stripe"
+          content={pageTitle}
         />
         <meta
           property="og:description"
@@ -29,13 +32,13 @@ const NotFoundPage = () => {
           property="og:url"
           content={`${window.location.origin}${location.pathname}`}
         />
-        <meta property="og:site_name" content="Visualize & Build ltd." />
+        <meta property="og:site_name" content={businessName} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
-          content="404 - Page Not Found | Visualize & Build ltd. - Stripe"
+          content={pageTitle}
         />
         <meta
           name="twitter:description"
@@ -47,7 +50,7 @@ const NotFoundPage = () => {
           name="keywords"
           content="404, page not found, error page, stripe dashboard"
         />
-        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="author" content={businessName} />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="w-full min-h-screen flex flex-col items-center justify-center py-12 px-4">

@@ -18,10 +18,13 @@ import CreateTransactionModal from "../../components/transactions/CreateTransact
 import EditTransactionModal from "../../components/transactions/EditTransactionModal";
 import { transactionService } from "../../services/transaction.service";
 import type { Transaction } from "../../types/transaction";
+import { useBusiness } from "../../context/BusinessContext";
 
 const AdminTransactionManagementPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { businessName } = useBusiness();
+  const pageTitle = `Transaction Management | ${businessName} - Stripe Admin`;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +169,7 @@ const AdminTransactionManagementPage = () => {
   return (
     <>
       <Helmet>
-        <title>Transaction Management | Visualize & Build ltd. - Stripe Admin</title>
+        <title>{pageTitle}</title>
         <meta
           name="description"
           content="Admin panel for managing and monitoring all transactions. Create, edit, delete, and track transactions with comprehensive filtering and search capabilities."
@@ -176,20 +179,20 @@ const AdminTransactionManagementPage = () => {
         <meta property="og:type" content="website" />
         <meta
           property="og:title"
-          content="Transaction Management | Visualize & Build ltd. - Stripe Admin"
+          content={pageTitle}
         />
         <meta
           property="og:description"
           content="Admin panel for managing and monitoring all transactions. Create, edit, delete, and track transactions with comprehensive filtering and search capabilities."
         />
         <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
-        <meta property="og:site_name" content="Visualize & Build ltd." />
+        <meta property="og:site_name" content={businessName} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
-          content="Transaction Management | Visualize & Build ltd. - Stripe Admin"
+          content={pageTitle}
         />
         <meta
           name="twitter:description"
@@ -201,7 +204,7 @@ const AdminTransactionManagementPage = () => {
           name="keywords"
           content="transaction management, admin panel, payment administration, transaction tracking, financial management, stripe admin"
         />
-        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="author" content={businessName} />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="w-full flex flex-col gap-6 p-6">

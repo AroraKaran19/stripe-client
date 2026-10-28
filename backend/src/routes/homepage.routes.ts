@@ -12,6 +12,8 @@ import {
   deleteCard,
   deleteTopSectionMetric,
   deleteHomepageHandler,
+  getBusinessNameHandler,
+  updateBusinessNameHandler,
 } from "../controller/homepage.controller";
 
 const router = Router();
@@ -27,6 +29,14 @@ router.get("/all", getAllHomepagesHandler);
 // Set a homepage as default
 // POST /api/homepage/set-default
 router.post("/set-default", setDefaultHomepageHandler);
+
+// Get the business name to display (falls back to the default homepage)
+// GET /api/homepage/business-name?username=john_doe
+router.get("/business-name", getBusinessNameHandler);
+
+// Update a homepage's business name
+// PUT /api/homepage/business-name
+router.put("/business-name", updateBusinessNameHandler);
 
 // Get specific card data
 // GET /api/homepage/card?username=john_doe&cardName=Payment Card&date=2025-01-15

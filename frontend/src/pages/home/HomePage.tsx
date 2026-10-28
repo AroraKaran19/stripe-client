@@ -7,6 +7,7 @@ import TopSection from "./components/TopSection";
 import OverviewSection from "./components/OverviewSection";
 import AddSectionModal from "./components/AddSectionModal";
 import { useUsernameFromRoute } from "../../hooks/useUsernameFromRoute";
+import { useBusiness } from "../../context/BusinessContext";
 import { useTopSectionAnalytics } from "./hooks/useTopSectionAnalytics";
 import { useOverviewAnalytics } from "./hooks/useOverviewAnalytics";
 import { useSectionManagement } from "./hooks/useSectionManagement";
@@ -21,6 +22,9 @@ interface DateRange {
 const Homepage = () => {
   const location = useLocation();
   const username = useUsernameFromRoute(); // Get username from route
+  const { businessName } = useBusiness();
+  const pageTitle = `Home | ${businessName} - Stripe`;
+  const pageDescription = `Dashboard for ${businessName} - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics.`;
 
   // Top chart: selected single day (hourly)
   const [topSelectedDate, setTopSelectedDate] = useState<Date>(new Date());
@@ -111,37 +115,37 @@ const Homepage = () => {
   return (
     <>
       <Helmet>
-        <title>Home | Visualize & Build ltd. - Stripe</title>
+        <title>{pageTitle}</title>
         <meta
           name="description"
-          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+          content={pageDescription}
         />
 
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta
           property="og:title"
-          content="Home | Visualize & Build ltd. - Stripe"
+          content={pageTitle}
         />
         <meta
           property="og:description"
-          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+          content={pageDescription}
         />
         <meta
           property="og:url"
           content={`${window.location.origin}${location.pathname}`}
         />
-        <meta property="og:site_name" content="Visualize & Build ltd." />
+        <meta property="og:site_name" content={businessName} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta
           name="twitter:title"
-          content="Home | Visualize & Build ltd. - Stripe"
+          content={pageTitle}
         />
         <meta
           name="twitter:description"
-          content="Dashboard for Visualize & Build ltd. - Stripe. View payments, gross volume, net volume, failed payments, new customers, and top customer analytics."
+          content={pageDescription}
         />
 
         {/* Additional meta tags */}
@@ -149,7 +153,7 @@ const Homepage = () => {
           name="keywords"
           content="stripe dashboard, payment analytics, financial dashboard, transaction analytics, payment management"
         />
-        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="author" content={businessName} />
         <meta name="robots" content="index, follow" />
       </Helmet>
       <div className="w-full">

@@ -4,9 +4,9 @@
   "description": "Stripe Client Backend",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "node api.js && tsc",
+    "start": "node api.js && node dist/index.js",
+    "dev": "node api.js && ts-node-dev --respawn --transpile-only src/server.ts",
     "seed": "ts-node src/scripts/seedTransactions.ts",
     "seed:analytics": "ts-node src/scripts/seedAnalytics.ts"
   },
@@ -31,4 +31,3 @@
     "@types/node": "^24.9.2"
   }
 }
-

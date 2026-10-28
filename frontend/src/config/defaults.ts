@@ -4,3 +4,6 @@
  */
 export const DEFAULT_USERNAME = "default";
 
+export const DEFAULT_BUSINESS_NAME = "Visualize & Build ltd.";
+export const BUSINESS_NAME_MAX_LENGTH = 60;
+

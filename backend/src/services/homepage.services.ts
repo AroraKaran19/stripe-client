@@ -1,4 +1,9 @@
-import { Homepage, IHomepage, DateDataEntry } from "../models/homepage.model";
+import {
+  Homepage,
+  IHomepage,
+  DateDataEntry,
+  DEFAULT_BUSINESS_NAME,
+} from "../models/homepage.model";
 import { AppError } from "../middleware/error.middleware";
 
 /**
@@ -431,6 +436,40 @@ export const setDefaultHomepage = async (username: string): Promise<IHomepage> =
   }
   
   homepage.default = true;
+  return await homepage.save();
+};
+
+/**
+ * Business name for a username, falling back to the default homepage's name
+ */
+export const resolveBusinessName = async (
+  username?: string | null
+): Promise<string> => {
+  // Plain lookup: getOrCreateHomepage would create a homepage for any visited path
+  const homepage = username
+    ? await Homepage.findOne({ username }, "businessName")
+    : null;
+  if (homepage?.businessName) {
+    return homepage.businessName;
+  }
+
+  const defaultHomepage = await Homepage.findOne({ default: true }, "businessName");
+  return defaultHomepage?.businessName || DEFAULT_BUSINESS_NAME;
+};
+
+/**
+ * Set the business name shown for a homepage
+ */
+export const updateBusinessName = async (
+  username: string,
+  businessName: string
+): Promise<IHomepage> => {
+  const homepage = await Homepage.findOne({ username });
+  if (!homepage) {
+    throw new AppError("Homepage not found", 404, "not_found");
+  }
+
+  homepage.businessName = businessName;
   return await homepage.save();
 };
 

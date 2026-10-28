@@ -14,8 +14,10 @@ import {
   deleteCardData,
   deleteTopSectionMetricData,
   deleteHomepage,
+  resolveBusinessName,
+  updateBusinessName,
 } from "../services/homepage.services";
-import { IHomepage } from "../models/homepage.model";
+import { IHomepage, BUSINESS_NAME_MAX_LENGTH } from "../models/homepage.model";
 import { asyncHandler } from "../middleware/error.middleware";
 
 /**
@@ -436,6 +438,60 @@ export const setDefaultHomepageHandler = asyncHandler(
       status: "success",
       data: homepage,
       message: "Default homepage updated successfully",
+    });
+  }
+);
+
+/**
+ * Get the business name to display for a username
+ * GET /api/homepage/business-name?username=john_doe
+ */
+export const getBusinessNameHandler = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const username = req.query.username as string | undefined;
+    const businessName = await resolveBusinessName(username);
+
+    return res.status(200).json({
+      status: "success",
+      data: { businessName },
+    });
+  }
+);
+
+/**
+ * Update a homepage's business name
+ * PUT /api/homepage/business-name
+ * Body: { username: "john_doe", businessName: "Acme Inc." }
+ */
+export const updateBusinessNameHandler = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { username, businessName } = req.body;
+    const trimmedName =
+      typeof businessName === "string" ? businessName.trim() : "";
+
+    if (!username || !trimmedName) {
+      return res.status(400).json({
+        status: "error",
+        message: "Username and businessName are required",
+      });
+    }
+
+    if (trimmedName.length > BUSINESS_NAME_MAX_LENGTH) {
+      return res.status(400).json({
+        status: "error",
+        message: `Business name must be ${BUSINESS_NAME_MAX_LENGTH} characters or fewer`,
+      });
+    }
+
+    const homepage = await updateBusinessName(username, trimmedName);
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        username: homepage.username,
+        businessName: homepage.businessName,
+      },
+      message: "Business name updated successfully",
     });
   }
 );

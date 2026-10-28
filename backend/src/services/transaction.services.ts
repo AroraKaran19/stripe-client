@@ -1,5 +1,6 @@
 import { Transaction, ITransaction } from "../models/transaction.model";
 import { AppError } from "../middleware/error.middleware";
+import { resolveBusinessName } from "./homepage.services";
 import mongoose from "mongoose";
 
 export const getAllTransactions = async (
@@ -114,7 +115,11 @@ export const createTransaction = async (
   data: Partial<ITransaction>
 ): Promise<ITransaction> => {
   try {
-    const transaction = new Transaction(data);
+    const transaction = new Transaction({
+      ...data,
+      statement_descriptor:
+        data.statement_descriptor || (await resolveBusinessName()),
+    });
     return await transaction.save();
   } catch (error) {
     throw new AppError("Failed to create transaction", 500);

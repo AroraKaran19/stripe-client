@@ -1,5 +1,8 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export const DEFAULT_BUSINESS_NAME = "Visualize & Build ltd.";
+export const BUSINESS_NAME_MAX_LENGTH = 60;
+
 // Time series data point
 export interface TimeSeriesDataPoint {
   timestamp: Date;
@@ -88,6 +91,7 @@ export interface TopCustomersCardData {
 export interface IHomepage extends Document {
   username: string; // Unique username identifier
   default: boolean; // Whether this is the default homepage
+  businessName?: string;
   top_section_data: TopSectionData;
   "Payment Card": DateDataEntry[];
   "Gross Volume Card": DateDataEntry[];
@@ -166,6 +170,11 @@ const HomepageSchema = new Schema(
       required: true,
       default: false,
       index: true,
+    },
+    businessName: {
+      type: String,
+      trim: true,
+      maxlength: BUSINESS_NAME_MAX_LENGTH,
     },
     top_section_data: {
       type: TopSectionDataSchema,

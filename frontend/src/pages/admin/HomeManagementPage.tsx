@@ -5,9 +5,13 @@ import {
   type HomepageData,
 } from "../../services/homepage.service";
 import { ChevronDown, Star, Trash2 } from "lucide-react";
+import BusinessNameEditor from "./components/BusinessNameEditor";
+import { useBusiness } from "../../context/BusinessContext";
+import { DEFAULT_BUSINESS_NAME } from "../../config/defaults";
 
 const HomeManagementPage = () => {
   const navigate = useNavigate();
+  const { refreshBusinessName } = useBusiness();
   const [searchParams, setSearchParams] = useSearchParams();
   const [homepages, setHomepages] = useState<HomepageData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +124,19 @@ const HomeManagementPage = () => {
       setMessage({ type: "error", text: errorMsg });
     }
   };
+
+  const handleBusinessNameSaved = (username: string, businessName: string) => {
+    setHomepages((prev) =>
+      prev.map((h) => (h.username === username ? { ...h, businessName } : h))
+    );
+    refreshBusinessName();
+  };
+
+  const selectedHomepage = homepages.find(
+    (h) => h.username === selectedUsername
+  );
+  const fallbackBusinessName =
+    homepages.find((h) => h.default)?.businessName || DEFAULT_BUSINESS_NAME;
 
   const sections = [
     {
@@ -268,6 +285,19 @@ const HomeManagementPage = () => {
               Managing data for:{" "}
               <span className="font-bold">{selectedUsername}</span>
             </p>
+          )}
+
+          {!loading && selectedHomepage && (
+            <BusinessNameEditor
+              key={selectedHomepage.username}
+              username={selectedHomepage.username}
+              isDefault={selectedHomepage.default}
+              savedName={selectedHomepage.businessName ?? ""}
+              fallbackName={fallbackBusinessName}
+              onSaved={(businessName) =>
+                handleBusinessNameSaved(selectedHomepage.username, businessName)
+              }
+            />
           )}
         </div>
 

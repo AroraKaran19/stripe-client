@@ -33,6 +33,7 @@ export interface HomepageData {
   _id?: string;
   username: string;
   default: boolean;
+  businessName?: string;
   top_section_data: {
     "Gross Volume": DateDataEntry[];
     "Net Volume": DateDataEntry[];
@@ -311,6 +312,43 @@ export const homepageService = {
 
     if (!response.ok) {
       throw new Error("Failed to set default homepage");
+    }
+    return response.json();
+  },
+
+  /**
+   * Get the business name to display for a username (default homepage if null)
+   */
+  getBusinessName: async (username: string | null = null): Promise<string> => {
+    const url = username
+      ? `${API_BASE_URL}/homepage/business-name?username=${encodeURIComponent(username)}`
+      : `${API_BASE_URL}/homepage/business-name`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to fetch business name");
+    }
+    const result = await response.json();
+    return result.data.businessName;
+  },
+
+  /**
+   * Update a homepage's business name
+   */
+  updateBusinessName: async (
+    username: string,
+    businessName: string
+  ): Promise<HomepageResponse> => {
+    const response = await fetch(`${API_BASE_URL}/homepage/business-name`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, businessName }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.message || "Failed to update business name");
     }
     return response.json();
   },

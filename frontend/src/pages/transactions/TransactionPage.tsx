@@ -6,6 +6,7 @@ import { cn } from "../../utils";
 import PaymentPage from "./components/PaymentPage";
 import { Construction } from "lucide-react";
 import { transactionService } from "../../services/transaction.service";
+import { useBusiness } from "../../context/BusinessContext";
 
 export interface FilterContainer {
   label: string;
@@ -14,6 +15,9 @@ export interface FilterContainer {
 
 const TransactionPage = () => {
   const location = useLocation();
+  const { businessName } = useBusiness();
+  const pageTitle = `Transactions | ${businessName} - Stripe`;
+  const pageDescription = `View and manage all your transactions with ${businessName}. Filter by status, date range, and track payment history for better financial management.`;
   const tabs = [
     "Payments",
     "Payouts",
@@ -79,28 +83,28 @@ const TransactionPage = () => {
   return (
     <>
       <Helmet>
-        <title>Transactions | Visualize & Build ltd. - Stripe</title>
+        <title>{pageTitle}</title>
         <meta
           name="description"
-          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+          content={pageDescription}
         />
 
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="Transactions | Visualize & Build ltd. - Stripe" />
+        <meta property="og:title" content={pageTitle} />
         <meta
           property="og:description"
-          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+          content={pageDescription}
         />
         <meta property="og:url" content={`${window.location.origin}${location.pathname}`} />
-        <meta property="og:site_name" content="Visualize & Build ltd." />
+        <meta property="og:site_name" content={businessName} />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Transactions | Visualize & Build ltd. - Stripe" />
+        <meta name="twitter:title" content={pageTitle} />
         <meta
           name="twitter:description"
-          content="View and manage all your transactions with Visualize & Build ltd. Filter by status, date range, and track payment history for better financial management."
+          content={pageDescription}
         />
 
         {/* Additional meta tags */}
@@ -108,7 +112,7 @@ const TransactionPage = () => {
           name="keywords"
           content="transactions, payments, stripe, financial management, payment history, transaction tracking, payment filters"
         />
-        <meta name="author" content="Visualize & Build ltd." />
+        <meta name="author" content={businessName} />
         <meta name="robots" content="index, follow" />
       </Helmet>
       <div className="py-4 w-full flex flex-col">
